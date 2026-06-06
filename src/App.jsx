@@ -1222,6 +1222,7 @@ export default function App() {
   const [vehiculos,setVehiculos]=useState([]);
   const [modReg,setModReg]=useState(false);
   const [modVeh,setModVeh]=useState(false);
+  const [loading,setLoading]=useState(true);
 
   const saveRegistro=useCallback(reg=>{
     if(reg._vehNuevo){setVehiculos(p=>p.find(v=>v.id===reg._vehNuevo.id)?p:[...p,reg._vehNuevo]);}
