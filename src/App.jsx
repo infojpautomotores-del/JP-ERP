@@ -1224,6 +1224,29 @@ export default function App() {
   const [modVeh,setModVeh]=useState(false);
   const [loading,setLoading]=useState(true);
 
+  const dbVehToLocal=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",costo:v.costo,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacionOrigenId:v.operacion_origen_id,fechaVenta:v.fecha_venta,precioVenta:v.precio_venta,vendedor:v.vendedor||""});
+  const dbRegToLocal=r=>({id:r.id,tipo:r.tipo,fecha:r.fecha,descripcion:r.descripcion,cuenta:r.cuenta,vendedor:r.vendedor||"",vehiculoId:r.vehiculo_id,notas:r.notas||"",importe:r.importe,formas:r.formas||[],esIngreso:r.es_ingreso,esAnticipo:r.es_anticipo,empleadoAnticipo:r.empleado_anticipo||""});
+  const localVehToDB=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",costo:parseFloat(v.costo)||0,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacion_origen_id:v.operacionOrigenId||null,fecha_venta:v.fechaVenta||null,precio_venta:v.precioVenta?parseFloat(v.precioVenta):null,vendedor:v.vendedor||null});
+  const localRegToDB=r=>({id:r.id,tipo:r.tipo,fecha:r.fecha,descripcion:r.descripcion,cuenta:r.cuenta,vendedor:r.vendedor||null,vehiculo_id:r.vehiculoId||null,notas:r.notas||null,importe:parseFloat(r.importe)||0,formas:r.formas||[],es_ingreso:r.esIngreso||false,es_anticipo:r.esAnticipo||false,empleado_anticipo:r.empleadoAnticipo||null});
+
+  useEffect(()=>{
+    const cargar=async()=>{
+      try{
+        const[{data:vData},{data:rData}]=await Promise.all([
+          supabase.from("vehiculos").select("*").order("fecha",{ascending:false}),
+          supabase.from("registros").select("*").order("fecha",{ascending:false}),
+        ]);
+        if(vData)setVehiculos(vData.map(dbVehToLocal));
+        if(rData)setRegistros(rData.map(dbRegToLocal));
+      }catch(e){
+        console.error("Error Supabase:",e);
+      }finally{
+        setLoading(false);
+      }
+    };
+    cargar();
+  },[]);
+
   const saveRegistro=useCallback(reg=>{
     if(reg._vehNuevo){setVehiculos(p=>p.find(v=>v.id===reg._vehNuevo.id)?p:[...p,reg._vehNuevo]);}
     const {_vehNuevo,...r}=reg;
