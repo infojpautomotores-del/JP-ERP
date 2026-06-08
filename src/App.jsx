@@ -293,18 +293,16 @@ function FormasPagoForm({formas, setFormas, total, allowEspecie=false}) {
 
 
 // Formateador de números para inputs
-const fmtInput = v => {
-  const n = v.replace(/\D/g,"");
-  if(!n) return "";
-  return parseInt(n,10).toLocaleString("es-AR");
-};
-const parseFmtInput = v => parseInt((v||"").replace(/\D/g,""),10)||0;
 
 function NumInp({label,value,onChange,style={},placeholder="0"}){
-  const [display,setDisplay]=useState(value?parseInt(value).toLocaleString("es-AR"):"");
-  useEffect(()=>{if(value====""||value===0||value===undefined)setDisplay("");},[value]);
+  const toDisplay=v=>{
+    const n=String(v||"").replace(/[^0-9]/g,"");
+    return n?parseInt(n,10).toLocaleString("es-AR"):"";
+  };
+  const [display,setDisplay]=useState(toDisplay(value));
+  useEffect(()=>{setDisplay(toDisplay(value));},[value]);
   const handleChange=e=>{
-    const raw=e.target.value.replace(/\D/g,"");
+    const raw=e.target.value.replace(/[^0-9]/g,"");
     setDisplay(raw?parseInt(raw,10).toLocaleString("es-AR"):"");
     onChange(raw);
   };
