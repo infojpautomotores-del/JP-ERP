@@ -251,7 +251,7 @@ function FormasPagoForm({formas, setFormas, total, allowEspecie=false}) {
               <select style={s.inp} value={f.tipo} onChange={e=>upd(f.id,"tipo",e.target.value)}>
                 {tipos.map(t=><option key={t}>{t}</option>)}
               </select>
-              <input type="number" style={s.inp} placeholder="Importe" value={f.importe} onChange={e=>upd(f.id,"importe",e.target.value)}/>
+              <input style={s.inp} placeholder="Importe" inputMode="numeric" value={f.importe?parseInt(String(f.importe).replace(/[^0-9]/g,""),10).toLocaleString("es-AR"):""} onChange={e=>upd(f.id,"importe",e.target.value.replace(/[^0-9]/g,""))}/>
             </div>
             {(f.tipo==="Cheque recibido"||f.tipo==="Cheque emitido") && (
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
@@ -328,6 +328,22 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   const [estadoPat,setEstadoPat] = useState("idle");
   const [formVeh,setFormVeh] = useState({descripcion:"",marca:"",modelo:"",anio:"",costo:"",tipoEntrada:"Compra directa"});
 
+  useEffect(()=>{
+    if(registroEditar){
+      setTipo(registroEditar.tipo||"Gasto general");
+      setEsConsignacion(!!registroEditar.esConsignacion);
+      setFecha(registroEditar.fecha||hoy());
+      setDesc(registroEditar.descripcion||"");
+      setCuenta(registroEditar.cuenta||"4.1");
+      setVendedor(registroEditar.vendedor||"");
+      setImporte(registroEditar.importe?.toString()||"");
+      setFormas(registroEditar.formas||[]);
+      setNotas(registroEditar.notas||"");
+      setPatente("");
+      setEstadoPat("idle");
+    }
+  },[registroEditar]);
+
   const esVenta=tipo==="Venta de vehículo", esCompra=tipo==="Compra de vehículo";
   const esGastoVeh=tipo==="Gasto por vehículo", esGastoGen=tipo==="Gasto general";
   const necesitaVeh=esVenta||esCompra||esGastoVeh;
@@ -363,6 +379,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
 
   const getVehId = () => {
     if(estadoPat==="encontrado"&&vehEnStock) return vehEnStock.id;
+    if(registroEditar) return registroEditar.vehiculoId||"__na__";
     return "__na__";
   };
 
@@ -385,7 +402,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   });
 
   return (
-    <Modal open={open} onClose={()=>{reset();onClose();}} title="Nuevo Registro" size="xl">
+    <Modal open={open} onClose={()=>{if(!registroEditar)reset();onClose();}} title={registroEditar?"Editar Registro":"Nuevo Registro"} size="xl">
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
         {/* Tipo */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
@@ -455,7 +472,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
                     <Inp label="Año" placeholder="2020" value={formVeh.anio} onChange={e=>setFormVeh(p=>({...p,anio:e.target.value}))}/>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <Inp label="Costo de entrada ($) *" type="number" placeholder="0" value={formVeh.costo} onChange={e=>setFormVeh(p=>({...p,costo:e.target.value}))}/>
+                    <NumInp label="Costo de entrada ($) *" placeholder="0" value={formVeh.costo} onChange={v=>setFormVeh(p=>({...p,costo:v}))}/>
                     <Sel label="Tipo" options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))} value={formVeh.tipoEntrada} onChange={e=>setFormVeh(p=>({...p,tipoEntrada:e.target.value}))}/>
                   </div>
                   <div style={{display:"flex",gap:8}}>
@@ -484,8 +501,8 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
         <Inp label="Notas" placeholder="Observaciones..." value={notas} onChange={e=>setNotas(e.target.value)}/>
 
         <div style={{display:"flex",gap:12,paddingTop:12,borderTop:`1px solid ${G.cardBorder}`,alignItems:"center",flexWrap:"wrap"}}>
-          <Btn onClick={guardar} disabled={!canSave} size="lg">Guardar</Btn>
-          <Btn variant="ghost" onClick={()=>{reset();onClose();}}>Cancelar</Btn>
+          <Btn onClick={guardar} disabled={!canSave} size="lg">{registroEditar?"Guardar cambios":"Guardar"}</Btn>
+          <Btn variant="ghost" onClick={()=>{if(!registroEditar)reset();onClose();}}>Cancelar</Btn>
           {esVenta&&!cobrosOk&&imp>0&&<span style={{fontSize:12,color:G.red,fontWeight:600}}>El total de formas de cobro no cierra</span>}
         </div>
       </div>
@@ -507,17 +524,27 @@ function ModalVehiculo({open,onClose,onSave,vehEditar=null}){
   return<Modal open={open}onClose={onClose}title={vehEditar?"Editar Vehículo":"Alta de vehículo"}size="lg"><div style={{display:"flex",flexDirection:"column",gap:12}}>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Patente *"value={f.patente}style={{textTransform:"uppercase"}}onChange={e=>upd("patente",e.target.value.toUpperCase())}/><Inp label="Descripción *"value={f.descripcion}onChange={e=>upd("descripcion",e.target.value)}/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12}}><Inp label="Marca"value={f.marca}onChange={e=>upd("marca",e.target.value)}/><Inp label="Modelo"value={f.modelo}onChange={e=>upd("modelo",e.target.value)}/><Inp label="Año"value={f.anio}onChange={e=>upd("anio",e.target.value)}/><Sel label="Color"options={COLORES_VEH.map(c=>({v:c,l:c}))}value={f.color}onChange={e=>upd("color",e.target.value)}/></div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Costo ($) *"type="number"value={f.costo}onChange={e=>upd("costo",e.target.value)}/><Sel label="Tipo"options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))}value={f.tipo}onChange={e=>upd("tipo",e.target.value)}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><NumInp label="Costo ($) *" placeholder="0" value={f.costo} onChange={v=>upd("costo",v)}/><Sel label="Tipo"options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))}value={f.tipo}onChange={e=>upd("tipo",e.target.value)}/></div>
     <Inp label="Fecha ingreso"type="date"value={f.fecha}onChange={e=>upd("fecha",e.target.value)}/>
     <Inp label="Notas"value={f.notas}onChange={e=>upd("notas",e.target.value)}/>
     <div style={{display:"flex",gap:12,paddingTop:12,borderTop:`1px solid ${G.cardBorder}`}}><Btn onClick={guardar}disabled={!f.patente||!f.descripcion||!f.costo}>{vehEditar?"Guardar cambios":"Dar de alta"}</Btn><Btn variant="ghost"onClick={onClose}>Cancelar</Btn></div>
   </div></Modal>;
 }
-function calcER(registros, mes) {
+function calcER(registros, mes, vehiculos=[]) {
+  // Solo gastos NO vinculados a vehículos cuentan en el mes en que se cargan (administración, comercialización, etc.)
+  // El costo de mercadería (CMV) se reconoce recién cuando el vehículo se VENDE — método "costo de venta"
   const regs = registros.filter(r=>r.fecha?.startsWith(mes)&&!r.esAnticipo);
-  const sumG = grupo => regs.filter(r=>PLAN[r.cuenta]?.grupo===grupo&&!r.esIngreso).reduce((s,r)=>s+r.importe,0);
+  const sumG = grupo => regs.filter(r=>PLAN[r.cuenta]?.grupo===grupo&&!r.esIngreso&&!PLAN[r.cuenta]?.esVehiculo).reduce((s,r)=>s+r.importe,0);
   const ingresos=regs.filter(r=>r.esIngreso).reduce((s,r)=>s+r.importe,0);
-  const cmv=sumG("Costo de Mercadería");
+
+  // CMV: costo total (compra + acondicionamientos) de los vehículos VENDIDOS este mes
+  const vendidosEsteMes = vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta?.startsWith(mes));
+  const cmv = vendidosEsteMes.reduce((sum,v)=>{
+    const costoCompra = parseFloat(v.costo)||0;
+    const acond = registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&PLAN[r.cuenta]?.esVehiculo).reduce((s,r)=>s+r.importe,0);
+    return sum + costoCompra + acond;
+  },0);
+
   const gBruta=ingresos-cmv;
   const comercial=sumG("Gastos de Comercialización");
   const resComercial=gBruta-comercial;
@@ -531,8 +558,19 @@ function calcER(registros, mes) {
   const retiro=sumG("Retiro del Socio");
   const resDespRetiro=resNeto-retiro;
   const detalle={};
-  Object.values(PLAN).forEach(c=>{detalle[c.codigo]=regs.filter(r=>r.cuenta===c.codigo).reduce((s,r)=>s+r.importe,0);});
-  return {ingresos,cmv,gBruta,comercial,resComercial,admin,ebitda,impositivos,bancarios,resAntesExtr,extraordinarios,resNeto,retiro,resDespRetiro,detalle,regs};
+  Object.values(PLAN).forEach(c=>{
+    if(c.esVehiculo){
+      detalle[c.codigo]=0; // el costo de vehículo se reconoce activado dentro de CMV, no por cuenta individual
+    } else {
+      detalle[c.codigo]=regs.filter(r=>r.cuenta===c.codigo).reduce((s,r)=>s+r.importe,0);
+    }
+  });
+  // Detalle especial de CMV: separar costo de compra vs acondicionamiento de los vendidos este mes
+  const cmvCompra = vendidosEsteMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0);
+  const cmvAcond = cmv - cmvCompra;
+  detalle["2.1"]=cmvCompra; // mostramos el costo de compra agregado acá para visibilidad
+  detalle["__cmv_acond"]=cmvAcond;
+  return {ingresos,cmv,gBruta,comercial,resComercial,admin,ebitda,impositivos,bancarios,resAntesExtr,extraordinarios,resNeto,retiro,resDespRetiro,detalle,regs,vendidosEsteMes};
 }
 
 // ─── SECCIONES ────────────────────────────────────────────────────────────────
@@ -578,7 +616,12 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
                     <td style={{padding:"12px 12px",color:G.text,fontWeight:600}}>{r.descripcion}</td>
                     <td style={{padding:"12px 12px",fontSize:11}}>{veh?<span style={{fontFamily:"monospace",color:G.textSub,fontWeight:700}}>{veh.patente}</span>:r.vehiculoId==="__na__"?<span style={{color:G.amber,fontWeight:700}}>⚠ Sin asignar</span>:"—"}</td>
                     <td style={{padding:"12px 12px",textAlign:"right",fontFamily:"monospace",fontWeight:800,color:r.esIngreso?G.green:G.red}}>{r.esIngreso?"+":"-"}{fmt(r.importe)}</td>
-                    <td style={{padding:"12px 12px",textAlign:"right"}}><Btn variant="danger" size="sm" onClick={()=>onEliminar(r.id)}>✕</Btn></td>
+                    <td style={{padding:"12px 12px",textAlign:"right"}}>
+                      <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                        <button onClick={()=>onEditar&&onEditar(r)} style={{background:"transparent",border:`1px solid ${G.inputBorder}`,borderRadius:6,color:G.textSub,padding:"3px 8px",fontSize:11,cursor:"pointer",fontFamily:F}}>✎</button>
+                        <Btn variant="danger" size="sm" onClick={()=>onEliminar(r.id)}>✕</Btn>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -760,15 +803,15 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
 }
 
 
-function SecEstadoResultado({registros}) {
+function SecEstadoResultado({registros,vehiculos}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
   const [mes,setMes]=useState(mesesDisp[0]||new Date().toISOString().slice(0,7));
   const [vista,setVista]=useState("cascada");
   const [expandidos,setExpandidos]=useState({});
   const toggleExp=g=>setExpandidos(p=>({...p,[g]:!p[g]}));
   const ultimos12=useMemo(()=>[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().slice(-12),[registros]);
-  const er=useMemo(()=>calcER(registros,mes),[registros,mes]);
-  const erMeses=useMemo(()=>ultimos12.map(m=>({mes:m,...calcER(registros,m)})),[registros,ultimos12]);
+  const er=useMemo(()=>calcER(registros,mes,vehiculos),[registros,mes,vehiculos]);
+  const erMeses=useMemo(()=>ultimos12.map(m=>({mes:m,...calcER(registros,m,vehiculos)})),[registros,ultimos12,vehiculos]);
 
   const stVal={
     "Costo de Mercadería":er.gBruta,"Gastos de Comercialización":er.resComercial,
@@ -797,6 +840,9 @@ function SecEstadoResultado({registros}) {
         </div>
       </div>
 
+      <div style={{background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,padding:"10px 16px",marginBottom:16,fontSize:12,color:G.blue,fontWeight:600}}>
+        ℹ️ CMV calculado por <strong>costo de venta</strong>: el costo de cada vehículo (compra + acondicionamiento) impacta el resultado recién cuando se vende, no cuando se compra. {er.vendidosEsteMes?.length>0&&`${er.vendidosEsteMes.length} vehículo(s) vendido(s) este mes activaron su costo.`}
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
         <KPI label="Ganancia Bruta" value={fmt(er.gBruta)} color={er.gBruta>=0?G.green:G.red} sub={`Margen: ${pct(er.gBruta,er.ingresos)}`}/>
         <KPI label="EBITDA" value={fmt(er.ebitda)} color={er.ebitda>=0?G.blue:G.red} sub="Resultado operativo"/>
@@ -1026,73 +1072,199 @@ function SecRentabilidad({vehiculos,registros}) {
   );
 }
 
-function SecFlujo({registros}) {
-  const movs=useMemo(()=>{
+function SecFlujo({registros}){
+  const [saldoInicial,setSaldoInicial]=useState(0);
+  const [fechaSaldo,setFechaSaldo]=useState(hoy());
+  const [sueldosConfig,setSueldosConfig]=useState([]);
+  const [comisionesConfig,setComisionesConfig]=useState([]);
+  const [modalConfig,setModalConfig]=useState(false);
+  const [modalSaldo,setModalSaldo]=useState(false);
+  const [formPago,setFormPago]=useState({nombre:"",tipo:"sueldo",importe:""});
+  const [saldoTemp,setSaldoTemp]=useState("");
+
+  const agregarPago=()=>{
+    if(!formPago.nombre||!formPago.importe)return;
+    const nuevo={id:uid(),nombre:formPago.nombre,importe:parseFloat(formPago.importe)};
+    if(formPago.tipo==="sueldo")setSueldosConfig(p=>[...p,nuevo]);
+    else setComisionesConfig(p=>[...p,nuevo]);
+    setFormPago({nombre:"",tipo:"sueldo",importe:""});
+  };
+
+  const anticiposPorEmp=useMemo(()=>{
+    const map={};
+    registros.filter(r=>r.esAnticipo).forEach(r=>{
+      const emp=r.empleadoAnticipo||"Sin asignar";
+      if(!map[emp])map[emp]=0;
+      map[emp]+=r.importe;
+    });
+    return map;
+  },[registros]);
+
+  const hoyStr=hoy();
+
+  const movsFuturos=useMemo(()=>{
     const items=[];
     registros.forEach(r=>{
-      if(r.esIngreso&&r.formas?.length>0){r.formas.filter(f=>f.tipo!=="Especie (vehículo)").forEach(f=>items.push({id:uid(),fecha:f.fechaCobro||r.fecha,desc:r.descripcion,tipo:"ingreso",importe:parseFloat(f.importe)||0,formaPago:f.tipo,banco:f.banco}));}
-      else if(!r.esIngreso){
-        const fs=r.formas?.length>0?r.formas:[{tipo:"Efectivo",importe:r.importe,banco:"",fechaCobro:""}];
-        fs.forEach(f=>items.push({id:uid(),fecha:f.fechaCobro||r.fecha,desc:r.descripcion,tipo:"egreso",importe:parseFloat(f.importe)||r.importe,formaPago:f.tipo,banco:f.banco}));
+      if(r.esIngreso&&r.formas?.length>0){
+        r.formas.filter(f=>(f.tipo==="Cheque recibido"||f.tipo==="Crédito / Financiera")&&f.fechaCobro&&f.fechaCobro>hoyStr).forEach(f=>{
+          items.push({id:uid(),fecha:f.fechaCobro,desc:r.descripcion,tipo:"ingreso",importe:parseFloat(f.importe)||0,formaPago:f.tipo,banco:f.banco});
+        });
+      }
+      if(!r.esIngreso&&r.formas?.length>0){
+        r.formas.filter(f=>f.tipo==="Cheque emitido"&&f.fechaCobro&&f.fechaCobro>hoyStr).forEach(f=>{
+          items.push({id:uid(),fecha:f.fechaCobro,desc:r.descripcion,tipo:"egreso",importe:parseFloat(f.importe)||0,formaPago:f.tipo,banco:f.banco});
+        });
       }
     });
-    return items.sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
-  },[registros]);
-  const hoyStr=hoy();
-  const porMes=useMemo(()=>{
-    const map={};
-    movs.forEach(m=>{const mes=m.fecha?.slice(0,7);if(!mes)return;if(!map[mes])map[mes]={mes,ingresos:0,egresos:0};if(m.tipo==="ingreso")map[mes].ingresos+=m.importe;else map[mes].egresos+=m.importe;});
-    return Object.values(map).sort((a,b)=>a.mes.localeCompare(b.mes)).map(d=>({...d,neto:d.ingresos-d.egresos,label:mesL(d.mes)}));
-  },[movs]);
-  const pend=movs.filter(m=>m.fecha>hoyStr&&(m.formaPago?.includes("Cheque")||m.formaPago?.includes("Crédito")));
-  const totC=pend.filter(m=>m.tipo==="ingreso").reduce((s,m)=>s+m.importe,0);
-  const totP=pend.filter(m=>m.tipo==="egreso").reduce((s,m)=>s+m.importe,0);
-  return (
-    <div>
-      <div style={{marginBottom:24}}><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Flujo de Fondos</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Proyección de entradas y salidas</p></div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
-        <KPI label="Por cobrar" value={fmt(totC)} color={G.green} sub={`${pend.filter(m=>m.tipo==="ingreso").length} mov.`}/>
-        <KPI label="Por pagar" value={fmt(totP)} color={G.red} sub={`${pend.filter(m=>m.tipo==="egreso").length} mov.`}/>
-        <KPI label="Posición neta" value={fmt(totC-totP)} color={totC-totP>=0?G.blue:G.red}/>
-        <KPI label="Total en flujo" value={movs.length.toString()} color={G.textSub} sub="movimientos"/>
+    const mesAct=hoyStr.slice(0,7);
+    const finMes=new Date(parseInt(mesAct.split("-")[0]),parseInt(mesAct.split("-")[1]),0).toISOString().split("T")[0];
+    sueldosConfig.forEach(s=>{
+      const anticipo=anticiposPorEmp[s.nombre]||0;
+      const neto=s.importe-anticipo;
+      if(neto>0)items.push({id:uid(),fecha:finMes,desc:`Sueldo ${s.nombre}`,tipo:"egreso",importe:neto,formaPago:"Sueldo",banco:"",esProyectado:true,detalle:`Sueldo ${fmtM(s.importe)} - Anticipo ${fmtM(anticipo)}`});
+    });
+    comisionesConfig.forEach(c=>{
+      items.push({id:uid(),fecha:finMes,desc:`Comisión ${c.nombre}`,tipo:"egreso",importe:c.importe,formaPago:"Comisión",banco:"",esProyectado:true});
+    });
+    return items.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  },[registros,sueldosConfig,comisionesConfig,anticiposPorEmp,hoyStr]);
+
+  const porSemana=useMemo(()=>{
+    const semanas={};
+    movsFuturos.forEach(m=>{
+      const d=new Date(m.fecha+"T00:00:00");
+      const dow=d.getDay();
+      const lunes=new Date(d);
+      lunes.setDate(d.getDate()-(dow===0?6:dow-1));
+      const key=lunes.toISOString().split("T")[0];
+      if(!semanas[key])semanas[key]={key,inicio:lunes,ingresos:[],egresos:[]};
+      if(m.tipo==="ingreso")semanas[key].ingresos.push(m);
+      else semanas[key].egresos.push(m);
+    });
+    return Object.values(semanas).sort((a,b)=>a.key.localeCompare(b.key));
+  },[movsFuturos]);
+
+  let acumulado=saldoInicial;
+  const semanasConAcum=porSemana.map(s=>{
+    const totI=s.ingresos.reduce((sum,m)=>sum+m.importe,0);
+    const totE=s.egresos.reduce((sum,m)=>sum+m.importe,0);
+    const neto=totI-totE;
+    acumulado+=neto;
+    return{...s,totI,totE,neto,acumulado};
+  });
+
+  const totCobrar=movsFuturos.filter(m=>m.tipo==="ingreso").reduce((s,m)=>s+m.importe,0);
+  const totPagar=movsFuturos.filter(m=>m.tipo==="egreso").reduce((s,m)=>s+m.importe,0);
+  const saldoProyectado=saldoInicial+totCobrar-totPagar;
+
+  const fmtSemana=d=>{const fin=new Date(d);fin.setDate(d.getDate()+6);return`${d.getDate()}/${d.getMonth()+1} — ${fin.getDate()}/${fin.getMonth()+1}`;};
+
+  return<div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
+      <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Flujo de Fondos</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13}}>Proyección semanal de entradas y salidas</p></div>
+      <div style={{display:"flex",gap:8}}>
+        <Btn variant="ghost" onClick={()=>{setSaldoTemp(saldoInicial?saldoInicial.toString():"");setModalSaldo(true);}}>💰 Saldo inicial</Btn>
+        <Btn onClick={()=>setModalConfig(true)}>⚙ Configurar sueldos</Btn>
       </div>
-      {porMes.length>0&&<Card style={{padding:20,marginBottom:16}}>
-        <div style={{fontWeight:800,color:G.text,fontSize:14,marginBottom:16}}>Ingresos vs Egresos por mes</div>
-        <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={porMes} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke={G.cardBorder}/>
-            <XAxis dataKey="label" tick={{fill:G.textSub,fontSize:11,fontWeight:600}}/>
-            <YAxis tick={{fill:G.textSub,fontSize:10}} tickFormatter={v=>fmtM(v)}/>
-            <Tooltip formatter={(v,n)=>[fmt(v),n]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F,fontWeight:600}}/>
-            <Legend wrapperStyle={{fontSize:12,fontWeight:700}}/>
-            <Bar dataKey="ingresos" name="Ingresos" fill={G.green} radius={[4,4,0,0]}/>
-            <Bar dataKey="egresos" name="Egresos" fill={G.red} radius={[4,4,0,0]}/>
-            <Line type="monotone" dataKey="neto" name="Neto" stroke={G.gold} strokeWidth={2} dot={{fill:G.gold,r:3}}/>
-          </ComposedChart>
-        </ResponsiveContainer>
-      </Card>}
-      <Card>
-        <div style={{padding:"16px 20px",borderBottom:`1px solid ${G.cardBorder}`,fontWeight:800,color:G.text,fontSize:14}}>Movimientos pendientes futuros</div>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-          <thead><tr style={{borderBottom:`1px solid ${G.cardBorder}`}}>
-            {["Fecha","Descripción","Tipo","Forma","Importe"].map(h=><th key={h} style={{padding:"12px 16px",textAlign:h==="Importe"?"right":"left",color:G.textSub,fontWeight:700,fontSize:11,textTransform:"uppercase"}}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {pend.length===0&&<tr><td colSpan={5} style={{textAlign:"center",padding:40,color:G.textDim,fontWeight:600}}>Sin movimientos futuros pendientes</td></tr>}
-            {pend.sort((a,b)=>a.fecha?.localeCompare(b.fecha)).map(m=>(
-              <tr key={m.id} style={{borderBottom:`1px solid ${G.cardBorder}`}}>
-                <td style={{padding:"12px 16px",color:G.textSub,fontWeight:600}}>{fmtF(m.fecha)}</td>
-                <td style={{padding:"12px 16px",color:G.text,fontWeight:600}}>{m.desc}</td>
-                <td style={{padding:"12px 16px"}}><Badge color={m.tipo==="ingreso"?"green":"red"}>{m.tipo}</Badge></td>
-                <td style={{padding:"12px 16px",color:G.textSub,fontSize:11,fontWeight:600}}>{m.formaPago}{m.banco?` · ${m.banco}`:""}</td>
-                <td style={{padding:"12px 16px",textAlign:"right",fontFamily:"monospace",fontWeight:800,color:m.tipo==="ingreso"?G.green:G.red}}>{m.tipo==="ingreso"?"+":"-"}{fmt(m.importe)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
     </div>
-  );
+
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+      <KPI label="Saldo inicial" value={fmt(saldoInicial)} color={G.text} sub={fmtF(fechaSaldo)}/>
+      <KPI label="Por cobrar" value={fmt(totCobrar)} color={G.green} sub={`${movsFuturos.filter(m=>m.tipo==="ingreso").length} mov.`}/>
+      <KPI label="Por pagar" value={fmt(totPagar)} color={G.red} sub={`${movsFuturos.filter(m=>m.tipo==="egreso").length} mov.`}/>
+      <KPI label="Saldo proyectado" value={fmt(saldoProyectado)} color={saldoProyectado>=0?G.blue:G.red}/>
+    </div>
+
+    {semanasConAcum.length===0?<Card style={{padding:40,textAlign:"center"}}>
+      <div style={{color:G.textDim,fontWeight:600,marginBottom:8}}>Sin movimientos futuros pendientes.</div>
+      <div style={{color:G.textDim,fontSize:12}}>Cargá un saldo inicial y/o configurá sueldos para ver la proyección.</div>
+    </Card>:(
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <Card style={{padding:"12px 20px",background:G.input,border:`1px solid ${G.gold}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontWeight:700,color:G.textSub,fontSize:13}}>Saldo disponible hoy</span>
+            <span style={{fontWeight:900,fontSize:18,color:G.gold,fontFamily:"monospace"}}>{fmt(saldoInicial)}</span>
+          </div>
+        </Card>
+        {semanasConAcum.map(sem=>(
+          <Card key={sem.key}>
+            <div style={{padding:"16px 20px",borderBottom:`1px solid ${G.cardBorder}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontWeight:800,color:G.text,fontSize:14}}>Semana del {fmtSemana(sem.inicio)}</div>
+                <div style={{fontSize:11,color:G.textSub,marginTop:2}}>Saldo acumulado: <span style={{color:sem.acumulado>=0?G.green:G.red,fontWeight:700}}>{fmt(sem.acumulado)}</span></div>
+              </div>
+              <div style={{display:"flex",gap:16,textAlign:"right"}}>
+                <div><div style={{fontSize:11,color:G.textSub}}>Ingresos</div><div style={{fontWeight:800,color:G.green,fontSize:14}}>{fmt(sem.totI)}</div></div>
+                <div><div style={{fontSize:11,color:G.textSub}}>Egresos</div><div style={{fontWeight:800,color:G.red,fontSize:14}}>{fmt(sem.totE)}</div></div>
+                <div><div style={{fontSize:11,color:G.textSub}}>Neto</div><div style={{fontWeight:900,color:sem.neto>=0?G.green:G.red,fontSize:15}}>{fmt(sem.neto)}</div></div>
+              </div>
+            </div>
+            <div style={{padding:"12px 20px"}}>
+              {sem.ingresos.length>0&&<div style={{marginBottom:8}}>
+                <div style={{fontSize:11,color:G.green,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Ingresos</div>
+                {sem.ingresos.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${G.cardBorder}`}}>
+                  <div><span style={{color:G.text,fontSize:12,fontWeight:600}}>{m.desc}</span><span style={{color:G.textDim,fontSize:11,marginLeft:8}}>{m.formaPago}{m.banco?` · ${m.banco}`:""} · {fmtF(m.fecha)}</span></div>
+                  <span style={{fontFamily:"monospace",color:G.green,fontWeight:700,fontSize:12}}>+{fmt(m.importe)}</span>
+                </div>)}
+              </div>}
+              {sem.egresos.length>0&&<div>
+                <div style={{fontSize:11,color:G.red,fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Egresos</div>
+                {sem.egresos.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderBottom:`1px solid ${G.cardBorder}`}}>
+                  <div><span style={{color:G.text,fontSize:12,fontWeight:600}}>{m.desc}</span>{m.esProyectado&&<span style={{color:G.amber,fontSize:10,fontWeight:700,marginLeft:6,background:"rgba(245,158,11,0.15)",padding:"1px 6px",borderRadius:4}}>PROYECTADO</span>}<span style={{color:G.textDim,fontSize:11,marginLeft:8}}>{m.formaPago} · {fmtF(m.fecha)}</span>{m.detalle&&<div style={{color:G.textDim,fontSize:10}}>{m.detalle}</div>}</div>
+                  <span style={{fontFamily:"monospace",color:G.red,fontWeight:700,fontSize:12}}>-{fmt(m.importe)}</span>
+                </div>)}
+              </div>}
+            </div>
+          </Card>
+        ))}
+      </div>
+    )}
+
+    <Modal open={modalSaldo} onClose={()=>setModalSaldo(false)} title="Saldo inicial de caja" size="sm">
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{color:G.textSub,fontSize:13,fontWeight:600}}>Cargá cuánta plata tenés disponible hoy (efectivo + bancos). El flujo de fondos va a proyectar el saldo acumulado a partir de este número.</div>
+        <NumInp label="Saldo disponible hoy ($)" value={saldoTemp} onChange={v=>setSaldoTemp(v)} placeholder="0"/>
+        <Inp label="Fecha de este saldo" type="date" value={fechaSaldo} onChange={e=>setFechaSaldo(e.target.value)}/>
+        <div style={{display:"flex",gap:12,paddingTop:8}}>
+          <Btn onClick={()=>{setSaldoInicial(parseFloat(saldoTemp)||0);setModalSaldo(false);}}>Guardar</Btn>
+          <Btn variant="ghost" onClick={()=>setModalSaldo(false)}>Cancelar</Btn>
+        </div>
+      </div>
+    </Modal>
+
+    <Modal open={modalConfig} onClose={()=>setModalConfig(false)} title="Configurar sueldos y comisiones" size="lg">
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{background:G.input,borderRadius:12,padding:16}}>
+          <div style={{fontWeight:700,color:G.text,fontSize:13,marginBottom:12}}>Agregar pago mensual</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:8,alignItems:"end"}}>
+            <Inp label="Empleado" placeholder="Nombre" value={formPago.nombre} onChange={e=>setFormPago(p=>({...p,nombre:e.target.value}))}/>
+            <Sel label="Tipo" options={[{v:"sueldo",l:"Sueldo"},{v:"comision",l:"Comisión"}]} value={formPago.tipo} onChange={e=>setFormPago(p=>({...p,tipo:e.target.value}))}/>
+            <NumInp label="Importe ($)" value={formPago.importe} onChange={v=>setFormPago(p=>({...p,importe:v}))} placeholder="0"/>
+            <Btn onClick={agregarPago} disabled={!formPago.nombre||!formPago.importe}>+ Agregar</Btn>
+          </div>
+        </div>
+        {sueldosConfig.length>0&&<div>
+          <div style={{fontWeight:700,color:G.textSub,fontSize:11,textTransform:"uppercase",marginBottom:8}}>Sueldos configurados</div>
+          {sueldosConfig.map(s=><div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:G.input,borderRadius:8,marginBottom:4}}>
+            <div><span style={{color:G.text,fontWeight:600}}>{s.nombre}</span><span style={{color:G.textDim,fontSize:11,marginLeft:8}}>Anticipo acumulado: {fmt(anticiposPorEmp[s.nombre]||0)}</span></div>
+            <div style={{display:"flex",gap:12,alignItems:"center"}}>
+              <span style={{color:G.gold,fontWeight:700}}>{fmt(s.importe)}</span>
+              <span style={{color:G.green,fontWeight:700,fontSize:11}}>→ Neto: {fmt(s.importe-(anticiposPorEmp[s.nombre]||0))}</span>
+              <Btn variant="danger" size="sm" onClick={()=>setSueldosConfig(p=>p.filter(x=>x.id!==s.id))}>✕</Btn>
+            </div>
+          </div>)}
+        </div>}
+        {comisionesConfig.length>0&&<div>
+          <div style={{fontWeight:700,color:G.textSub,fontSize:11,textTransform:"uppercase",marginBottom:8}}>Comisiones configuradas</div>
+          {comisionesConfig.map(c=><div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:G.input,borderRadius:8,marginBottom:4}}>
+            <span style={{color:G.text,fontWeight:600}}>{c.nombre}</span>
+            <div style={{display:"flex",gap:12,alignItems:"center"}}><span style={{color:G.amber,fontWeight:700}}>{fmt(c.importe)}</span><Btn variant="danger" size="sm" onClick={()=>setComisionesConfig(p=>p.filter(x=>x.id!==c.id))}>✕</Btn></div>
+          </div>)}
+        </div>}
+        <div style={{paddingTop:12,borderTop:`1px solid ${G.cardBorder}`}}><Btn onClick={()=>setModalConfig(false)}>Listo</Btn></div>
+      </div>
+    </Modal>
+  </div>;
 }
 
 function SecCheques({registros}) {
@@ -1190,9 +1362,9 @@ function SecAnticipos({registros}) {
 function SecDashboard({registros,vehiculos}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().reverse();
   const [mes,setMes]=useState(mesesDisp[0]||new Date().toISOString().slice(0,7));
-  const er=useMemo(()=>calcER(registros,mes),[registros,mes]);
+  const er=useMemo(()=>calcER(registros,mes,vehiculos),[registros,mes,vehiculos]);
   const idx=mesesDisp.indexOf(mes);
-  const erPrev=useMemo(()=>mesesDisp[idx+1]?calcER(registros,mesesDisp[idx+1]):null,[registros,idx,mesesDisp]);
+  const erPrev=useMemo(()=>mesesDisp[idx+1]?calcER(registros,mesesDisp[idx+1],vehiculos):null,[registros,idx,mesesDisp,vehiculos]);
   const vMes=vehiculos.filter(v=>v.fechaVenta?.startsWith(mes));
   const vMesPrev=vehiculos.filter(v=>v.fechaVenta?.startsWith(mesesDisp[idx+1]||"____"));
   const enStock=vehiculos.filter(v=>v.estado==="En stock");
@@ -1210,7 +1382,7 @@ function SecDashboard({registros,vehiculos}) {
   const totExtras=extrasMes.reduce((s,r)=>s+r.importe,0);
   const ultimos6=useMemo(()=>{
     const ms=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().slice(-6);
-    return ms.map(m=>{const e=calcER(registros,m);return{label:mesL(m),ingresos:e.ingresos,egresos:e.cmv+e.comercial+e.admin+e.impositivos+e.bancarios,neto:e.resNeto};});
+    return ms.map(m=>{const e=calcER(registros,m,vehiculos);return{label:mesL(m),ingresos:e.ingresos,egresos:e.cmv+e.comercial+e.admin+e.impositivos+e.bancarios,neto:e.resNeto};});
   },[registros]);
   const porVendedor=useMemo(()=>{
     const map={};
@@ -1490,7 +1662,7 @@ export default function App() {
           {tab==="dashboard"    && <SecDashboard     registros={registros} vehiculos={vehiculos}/>}
           {tab==="registros"    && <SecRegistros     registros={registros} vehiculos={vehiculos} onNuevo={()=>setModReg(true)} onEliminar={eliminarRegistro} onEditar={r=>{setRegEditar(r);setModReg(true);}}/> }
           {tab==="stock"        && <SecStock         vehiculos={vehiculos} registros={registros} onNuevo={()=>setModVeh(true)} onEditar={v=>{setVehEditar(v);setModVeh(true);}}/>}
-          {tab==="resultado"    && <SecEstadoResultado registros={registros}/>}
+          {tab==="resultado"    && <SecEstadoResultado registros={registros} vehiculos={vehiculos}/>}
           {tab==="rentabilidad" && <SecRentabilidad  vehiculos={vehiculos} registros={registros}/>}
           {tab==="flujo"        && <SecFlujo         registros={registros}/>}
           {tab==="cheques"      && <SecCheques       registros={registros}/>}
