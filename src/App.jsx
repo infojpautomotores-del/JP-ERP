@@ -326,6 +326,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   const [notas,setNotas] = useState("");
   const [patente,setPatente] = useState("");
   const [estadoPat,setEstadoPat] = useState("idle");
+  const [mostrarLista,setMostrarLista] = useState(false);
   const [formVeh,setFormVeh] = useState({descripcion:"",marca:"",modelo:"",anio:"",costo:"",tipoEntrada:"Compra directa"});
 
   useEffect(()=>{
@@ -366,9 +367,18 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
     const up = val.toUpperCase().replace(/\s/g,"");
     setPatente(up);
     setEstadoPat("idle");
+    setMostrarLista(true);
     setFormVeh({descripcion:"",marca:"",modelo:"",anio:"",costo:"",tipoEntrada:"Compra directa"});
     if(up.length>=5) setEstadoPat(vehiculos.find(v=>v.patente===up)?"encontrado":"no_encontrado");
   };
+
+  const seleccionarVehiculo = v => {
+    setPatente(v.patente);
+    setEstadoPat("encontrado");
+    setMostrarLista(false);
+  };
+
+  const vehiculosDisponibles = vehiculos.filter(v=>v.estado==="En stock"&&(!patente||v.patente.includes(patente)));
 
   const reset = () => {
     setTipo("Venta de vehículo");setFecha(hoy());setDesc("");setCuenta("1.1");
@@ -426,11 +436,29 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
         {/* Patente inline */}
         {necesitaVeh && (
           <div style={{display:"grid",gridTemplateColumns:esVenta?"1fr 1fr":"1fr",gap:12,alignItems:"start"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:8,position:"relative"}}>
               <Inp label={esVenta?"Patente vehículo vendido":esCompra?"Patente vehículo comprado":"Patente vehículo asociado"}
-                placeholder="Ej: AA123BC" value={patente} maxLength={8}
+                placeholder="Ej: AA123BC o elegí de la lista" value={patente} maxLength={8}
                 style={{textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}
-                onChange={e=>handlePatente(e.target.value)}/>
+                onChange={e=>handlePatente(e.target.value)}
+                onFocus={()=>setMostrarLista(true)}
+                onBlur={()=>setTimeout(()=>setMostrarLista(false),150)}/>
+
+              {mostrarLista&&estadoPat!=="encontrado"&&(!esCompra)&&vehiculosDisponibles.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,background:G.card,border:`1px solid ${G.gold}`,borderRadius:10,marginTop:4,maxHeight:220,overflowY:"auto",boxShadow:"0 12px 30px rgba(0,0,0,0.6)"}}>
+                  <div style={{padding:"6px 12px",fontSize:10,color:G.textDim,fontWeight:700,textTransform:"uppercase",borderBottom:`1px solid ${G.cardBorder}`}}>Vehículos en stock</div>
+                  {vehiculosDisponibles.map(v=>(
+                    <div key={v.id} onClick={()=>seleccionarVehiculo(v)} style={{padding:"10px 12px",cursor:"pointer",borderBottom:`1px solid ${G.cardBorder}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                      onMouseDown={e=>e.preventDefault()}>
+                      <div>
+                        <span style={{fontFamily:"monospace",fontWeight:800,color:G.gold,marginRight:8}}>{v.patente}</span>
+                        <span style={{color:G.text,fontSize:13,fontWeight:600}}>{v.descripcion}</span>
+                      </div>
+                      {v.tipo==="Consignación"&&<Badge color="blue">Consig.</Badge>}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {estadoPat==="encontrado"&&vehEnStock&&(
                 <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.3)",borderRadius:10,padding:"10px 14px"}}>
@@ -667,7 +695,12 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
     const gan=v.precioVenta?(parseFloat(v.precioVenta)-costo):null;
     return{...v,acond,costo,gan,gastos:gs};
   });
-  const lista=vCC.filter(v=>!filtro||v.estado===filtro);
+  const lista=vCC.filter(v=>{
+    if(!filtro)return true;
+    if(filtro==="Consignación")return v.estado==="En stock"&&v.tipo==="Consignación";
+    if(filtro==="En stock")return v.estado==="En stock"&&v.tipo!=="Consignación";
+    return v.estado===filtro;
+  });
   const valorStock=vCC.filter(v=>v.estado==="En stock").reduce((s,v)=>s+v.costo,0);
   const propios=vCC.filter(v=>v.estado==="En stock"&&v.tipo!=="Consignación");
   const consignados=vCC.filter(v=>v.estado==="En stock"&&v.tipo==="Consignación");
