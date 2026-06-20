@@ -512,19 +512,24 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
 
 // ─── MODAL VEHÍCULO ───────────────────────────────────────────────────────────
 function ModalVehiculo({open,onClose,onSave,vehEditar=null}){
-  const [f,setF]=useState({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:""});
-  useEffect(()=>{if(vehEditar)setF({patente:vehEditar.patente||"",descripcion:vehEditar.descripcion||"",marca:vehEditar.marca||"",modelo:vehEditar.modelo||"",anio:vehEditar.anio||"",color:vehEditar.color||"",costo:vehEditar.costo?.toString()||"",tipo:vehEditar.tipo||"Compra directa",fecha:vehEditar.fecha||hoy(),notas:vehEditar.notas||""});},[vehEditar]);
+  const [f,setF]=useState({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false});
+  useEffect(()=>{if(vehEditar)setF({patente:vehEditar.patente||"",descripcion:vehEditar.descripcion||"",marca:vehEditar.marca||"",modelo:vehEditar.modelo||"",anio:vehEditar.anio||"",color:vehEditar.color||"",costo:vehEditar.costo?.toString()||"",tipo:vehEditar.tipo||"Compra directa",fecha:vehEditar.fecha||hoy(),notas:vehEditar.notas||"",esConsignacion:vehEditar.tipo==="Consignación"});},[vehEditar]);
   const upd=(k,v)=>setF(p=>({...p,[k]:v}));
   const guardar=()=>{
-    const veh={...(vehEditar||{}),id:vehEditar?.id||uid(),...f,estado:vehEditar?.estado||"En stock",operacionOrigenId:vehEditar?.operacionOrigenId||null,fechaVenta:vehEditar?.fechaVenta||null,precioVenta:vehEditar?.precioVenta||null,_esEdicion:!!vehEditar};
+    const tipoFinal=f.esConsignacion?"Consignación":(f.tipo==="Consignación"?"Compra directa":f.tipo);
+    const veh={...(vehEditar||{}),id:vehEditar?.id||uid(),...f,tipo:tipoFinal,estado:vehEditar?.estado||"En stock",operacionOrigenId:vehEditar?.operacionOrigenId||null,fechaVenta:vehEditar?.fechaVenta||null,precioVenta:vehEditar?.precioVenta||null,_esEdicion:!!vehEditar};
     onSave(veh);
-    if(!vehEditar)setF({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:""});
+    if(!vehEditar)setF({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false});
     onClose();
   };
   return<Modal open={open}onClose={onClose}title={vehEditar?"Editar Vehículo":"Alta de vehículo"}size="lg"><div style={{display:"flex",flexDirection:"column",gap:12}}>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Patente *"value={f.patente}style={{textTransform:"uppercase"}}onChange={e=>upd("patente",e.target.value.toUpperCase())}/><Inp label="Descripción *"value={f.descripcion}onChange={e=>upd("descripcion",e.target.value)}/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12}}><Inp label="Marca"value={f.marca}onChange={e=>upd("marca",e.target.value)}/><Inp label="Modelo"value={f.modelo}onChange={e=>upd("modelo",e.target.value)}/><Inp label="Año"value={f.anio}onChange={e=>upd("anio",e.target.value)}/><Sel label="Color"options={COLORES_VEH.map(c=>({v:c,l:c}))}value={f.color}onChange={e=>upd("color",e.target.value)}/></div>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><NumInp label="Costo ($) *" placeholder="0" value={f.costo} onChange={v=>upd("costo",v)}/><Sel label="Tipo"options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))}value={f.tipo}onChange={e=>upd("tipo",e.target.value)}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><NumInp label="Costo / Precio mínimo ($) *" placeholder="0" value={f.costo} onChange={v=>upd("costo",v)}/><Sel label="Tipo de entrada"options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))}value={f.tipo==="Consignación"?"Compra directa":f.tipo}onChange={e=>upd("tipo",e.target.value)}/></div>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.3)",borderRadius:10}}>
+      <input type="checkbox" id="consigStock" checked={f.esConsignacion} onChange={e=>upd("esConsignacion",e.target.checked)} style={{width:16,height:16,cursor:"pointer",accentColor:G.blue}}/>
+      <label htmlFor="consigStock" style={{color:G.blue,fontWeight:700,fontSize:13,cursor:"pointer"}}>Consignación — este vehículo no es propio, fue recibido para vender</label>
+    </div>
     <Inp label="Fecha ingreso"type="date"value={f.fecha}onChange={e=>upd("fecha",e.target.value)}/>
     <Inp label="Notas"value={f.notas}onChange={e=>upd("notas",e.target.value)}/>
     <div style={{display:"flex",gap:12,paddingTop:12,borderTop:`1px solid ${G.cardBorder}`}}><Btn onClick={guardar}disabled={!f.patente||!f.descripcion||!f.costo}>{vehEditar?"Guardar cambios":"Dar de alta"}</Btn><Btn variant="ghost"onClick={onClose}>Cancelar</Btn></div>
@@ -633,11 +638,26 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
   );
 }
 
-function SecStock({vehiculos,registros,onNuevo,onEditar}){
+function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoCambio}){
   const [filtro,setFiltro]=useState("En stock");
   const [det,setDet]=useState(null);
   const [vistaStock,setVistaStock]=useState("lista");
   const [metricaStock,setMetricaStock]=useState("unidades");
+  const [modalTC,setModalTC]=useState(false);
+  const [verUSD,setVerUSD]=useState(false);
+  const [mesEditTC,setMesEditTC]=useState("");
+  const [valorEditTC,setValorEditTC]=useState("");
+
+  const mesActual=hoy().slice(0,7);
+  const tcActual=tiposCambio[mesActual]||0;
+
+  // Busca el TC del mes, o el más cercano anterior disponible si no hay uno exacto
+  const tcParaMes=(mes)=>{
+    if(tiposCambio[mes])return tiposCambio[mes];
+    const mesesConTC=Object.keys(tiposCambio).filter(m=>m<=mes).sort();
+    if(mesesConTC.length>0)return tiposCambio[mesesConTC[mesesConTC.length-1]];
+    return 0;
+  };
 
   const vCC=vehiculos.map(v=>{
     const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso);
@@ -654,6 +674,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
   const valorPropios=propios.reduce((s,v)=>s+v.costo,0);
   const valorConsignados=consignados.reduce((s,v)=>s+v.costo,0);
   const ecol={"En stock":"gold","Reservado":"amber","Vendido":"gray","Consignación":"blue"};
+  const fmtUsd=(v,mes=mesActual)=>{const tc=tcParaMes(mes);return tc>0?"US$ "+Math.round(v/tc).toLocaleString("es-AR"):"—";};
 
   const evolucion=useMemo(()=>{
     const meses=[...new Set([...registros.map(r=>r.fecha?.slice(0,7)),...vehiculos.map(v=>v.fecha?.slice(0,7)),...vehiculos.filter(v=>v.fechaVenta).map(v=>v.fechaVenta?.slice(0,7))])].filter(Boolean).sort();
@@ -661,26 +682,41 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
       const enStockMes=vehiculos.filter(v=>{const ing=v.fecha?.slice(0,7)<=mes;const vend=v.fechaVenta&&v.fechaVenta?.slice(0,7)<=mes;return ing&&!vend;});
       const propiosMes=enStockMes.filter(v=>v.tipo!=="Consignación");
       const consigMes=enStockMes.filter(v=>v.tipo==="Consignación");
-      return{label:mesL(mes),mes,unidades:enStockMes.length,importe:enStockMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0),propios:propiosMes.length,consignacion:consigMes.length,importePropios:propiosMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0),importeConsig:consigMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0)};
+      const impPropios=propiosMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0);
+      const impConsig=consigMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0);
+      const tcMes=tcParaMes(mes);
+      return{label:mesL(mes),mes,unidades:enStockMes.length,importe:impPropios+impConsig,propios:propiosMes.length,consignacion:consigMes.length,importePropios:impPropios,importeConsig:impConsig,tcMes,usdPropios:tcMes>0?impPropios/tcMes:0,usdConsig:tcMes>0?impConsig/tcMes:0,usdTotal:tcMes>0?(impPropios+impConsig)/tcMes:0};
     });
-  },[vehiculos,registros]);
+  },[vehiculos,registros,tiposCambio]);
 
   const porModelo=useMemo(()=>{const map={};vehiculos.filter(v=>v.estado==="Vendido").forEach(v=>{const k=v.modelo||"Sin modelo";if(!map[k])map[k]={nombre:k,cantidad:0,ganancia:0};const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso).reduce((s,r)=>s+r.importe,0);const ct=(parseFloat(v.costo)||0)+gs;map[k].cantidad++;map[k].ganancia+=((parseFloat(v.precioVenta)||0)-ct);});return Object.values(map).sort((a,b)=>b.cantidad-a.cantidad);},[vehiculos,registros]);
   const porColor=useMemo(()=>{const map={};vehiculos.filter(v=>v.estado==="Vendido"&&v.color).forEach(v=>{const k=v.color;if(!map[k])map[k]={nombre:k,cantidad:0};map[k].cantidad++;});return Object.values(map).sort((a,b)=>b.cantidad-a.cantidad);},[vehiculos]);
 
+  const mesesOrdenados=Object.keys(tiposCambio).sort().reverse();
+  const guardarTC=()=>{
+    if(!mesEditTC||!valorEditTC)return;
+    guardarTipoCambio(mesEditTC,valorEditTC);
+    setMesEditTC("");setValorEditTC("");
+  };
+
   return<div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
       <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Stock de Vehículos</h2></div>
-      <div style={{display:"flex",gap:8}}>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
         {[{v:"lista",l:"Lista"},{v:"evolucion",l:"Evolución"},{v:"metricas",l:"Métricas"}].map(t=><button key={t.v}onClick={()=>setVistaStock(t.v)}style={{padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vistaStock===t.v?G.gold:G.input,color:vistaStock===t.v?"#000":G.textSub}}>{t.l}</button>)}
+        <Btn variant="ghost" onClick={()=>setModalTC(true)}>💵 {tcActual>0?`$${tcActual.toLocaleString("es-AR")}`:"Tipos de cambio"}</Btn>
         <Btn onClick={onNuevo}>+ Alta</Btn>
       </div>
     </div>
 
+    {tcActual>0&&<div style={{marginBottom:16}}>
+      <button onClick={()=>setVerUSD(p=>!p)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:verUSD?G.blue:"transparent",color:verUSD?"#fff":G.textSub}}>{verUSD?"✓ ":""}Mostrar valores en USD (TC del mes actual: {tcActual.toLocaleString("es-AR")})</button>
+    </div>}
+
     <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:12}}>
-      <KPI label="Stock total" value={`${vCC.filter(v=>v.estado==="En stock").length} autos`} color={G.text} sub={fmt(valorStock)}/>
-      <KPI label="Propios" value={`${propios.length} autos`} color={G.gold} sub={`Capital ${fmt(valorPropios)}`}/>
-      <KPI label="Consignación" value={`${consignados.length} autos`} color={G.blue} sub={`Capital ${fmt(valorConsignados)}`}/>
+      <KPI label="Stock total" value={`${vCC.filter(v=>v.estado==="En stock").length} autos`} color={G.text} sub={verUSD&&tcActual>0?fmtUsd(valorStock):fmt(valorStock)}/>
+      <KPI label="Propios" value={`${propios.length} autos`} color={G.gold} sub={`Capital ${verUSD&&tcActual>0?fmtUsd(valorPropios):fmt(valorPropios)}`}/>
+      <KPI label="Consignación" value={`${consignados.length} autos`} color={G.blue} sub={`Capital ${verUSD&&tcActual>0?fmtUsd(valorConsignados):fmt(valorConsignados)}`}/>
       <KPI label="Vendidos" value={`${vCC.filter(v=>v.estado==="Vendido").length} autos`} color={G.textSub}/>
     </div>
 
@@ -698,10 +734,10 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
           </div>
         </div>
         <div>
-          <div style={{fontSize:11,color:G.textSub,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Capital comprometido</div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}><span style={{color:G.gold,fontSize:12,fontWeight:600}}>Capital propio</span><span style={{fontFamily:"monospace",fontWeight:700,color:G.gold}}>{fmt(valorPropios)}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}><span style={{color:G.blue,fontSize:12,fontWeight:600}}>En consignación</span><span style={{fontFamily:"monospace",fontWeight:700,color:G.blue}}>{fmt(valorConsignados)}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 0",borderTop:`1px solid ${G.cardBorder}`,marginTop:4}}><span style={{color:G.text,fontSize:12,fontWeight:800}}>Total</span><span style={{fontFamily:"monospace",fontWeight:900,color:G.text}}>{fmt(valorStock)}</span></div>
+          <div style={{fontSize:11,color:G.textSub,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>Capital comprometido {verUSD&&tcActual>0?"(USD)":"(ARS)"}</div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}><span style={{color:G.gold,fontSize:12,fontWeight:600}}>Capital propio</span><span style={{fontFamily:"monospace",fontWeight:700,color:G.gold}}>{verUSD&&tcActual>0?fmtUsd(valorPropios):fmt(valorPropios)}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0"}}><span style={{color:G.blue,fontSize:12,fontWeight:600}}>En consignación</span><span style={{fontFamily:"monospace",fontWeight:700,color:G.blue}}>{verUSD&&tcActual>0?fmtUsd(valorConsignados):fmt(valorConsignados)}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0 0",borderTop:`1px solid ${G.cardBorder}`,marginTop:4}}><span style={{color:G.text,fontSize:12,fontWeight:800}}>Total</span><span style={{fontFamily:"monospace",fontWeight:900,color:G.text}}>{verUSD&&tcActual>0?fmtUsd(valorStock):fmt(valorStock)}</span></div>
         </div>
       </div>
     </Card>}
@@ -713,9 +749,9 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
       <Card>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-            <thead><tr style={{borderBottom:`1px solid ${G.cardBorder}`}}>{["Patente","Descripción","Tenencia","Color","Año","Costo","Acond.","Total","Venta","Ganancia","Estado",""].map(h=><th key={h}style={{padding:"10px",textAlign:["Costo","Acond.","Total","Venta","Ganancia"].includes(h)?"right":"left",color:G.textSub,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{borderBottom:`1px solid ${G.cardBorder}`}}>{["Patente","Descripción","Tenencia","Color","Año","Costo",...(tcActual>0?["USD"]:[]),"Acond.","Total","Venta","Ganancia","Estado",""].map(h=><th key={h}style={{padding:"10px",textAlign:["Costo","USD","Acond.","Total","Venta","Ganancia"].includes(h)?"right":"left",color:G.textSub,fontWeight:700,fontSize:10,textTransform:"uppercase"}}>{h}</th>)}</tr></thead>
             <tbody>
-              {lista.length===0&&<tr><td colSpan={12}style={{textAlign:"center",padding:40,color:G.textDim,fontWeight:600}}>Sin vehículos</td></tr>}
+              {lista.length===0&&<tr><td colSpan={13}style={{textAlign:"center",padding:40,color:G.textDim,fontWeight:600}}>Sin vehículos</td></tr>}
               {lista.map(v=><tr key={v.id}style={{borderBottom:`1px solid ${G.cardBorder}`,cursor:"pointer"}}onClick={()=>setDet(v)}>
                 <td style={{padding:"10px",fontFamily:"monospace",color:G.text,fontWeight:800}}>{v.patente}</td>
                 <td style={{padding:"10px",color:G.text,fontWeight:600}}>{v.descripcion}</td>
@@ -723,6 +759,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
                 <td style={{padding:"10px",color:G.textSub,fontSize:11}}>{v.color||"—"}</td>
                 <td style={{padding:"10px",color:G.textSub,fontSize:11}}>{v.anio||"—"}</td>
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.textSub,fontWeight:600}}>{fmt(parseFloat(v.costo)||0)}</td>
+                {tcActual>0&&<td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.blue,fontWeight:600,fontSize:11}}>{fmtUsd(v.costo,v.fecha?.slice(0,7))}</td>}
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.amber,fontWeight:700}}>{v.acond>0?fmt(v.acond):"—"}</td>
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.text,fontWeight:800}}>{fmt(v.costo)}</td>
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.green,fontWeight:700}}>{v.precioVenta?fmt(v.precioVenta):"—"}</td>
@@ -738,10 +775,10 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
 
     {vistaStock==="evolucion"&&<>
       <Card style={{padding:20,marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
           <div style={{fontWeight:800,color:G.text,fontSize:14}}>Evolución del stock — propios vs consignación</div>
           <div style={{display:"flex",gap:8}}>
-            {[{v:"unidades",l:"Unidades"},{v:"importe",l:"Importe"}].map(t=><button key={t.v}onClick={()=>setMetricaStock(t.v)}style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:metricaStock===t.v?G.gold:G.input,color:metricaStock===t.v?"#000":G.textSub}}>{t.l}</button>)}
+            {[{v:"unidades",l:"Unidades"},{v:"importe",l:"Importe ARS"},...(mesesOrdenados.length>0?[{v:"usd",l:"Importe USD"}]:[])].map(t=><button key={t.v}onClick={()=>setMetricaStock(t.v)}style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:metricaStock===t.v?G.gold:G.input,color:metricaStock===t.v?"#000":G.textSub}}>{t.l}</button>)}
           </div>
         </div>
         {evolucion.length===0?<div style={{textAlign:"center",padding:40,color:G.textDim}}>Sin datos</div>:(
@@ -749,16 +786,19 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
             <ComposedChart data={evolucion}>
               <CartesianGrid strokeDasharray="3 3"stroke={G.cardBorder}/>
               <XAxis dataKey="label"tick={{fill:G.textSub,fontSize:11}}/>
-              <YAxis tick={{fill:G.textSub,fontSize:10}}tickFormatter={v=>metricaStock==="importe"?fmtM(v):v}/>
-              <Tooltip formatter={(v,n)=>metricaStock==="importe"?[fmt(v),n]:[`${v} uds`,n]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}} labelStyle={{color:G.text,fontWeight:700}}/>
+              <YAxis tick={{fill:G.textSub,fontSize:10}}tickFormatter={v=>metricaStock==="unidades"?v:(metricaStock==="usd"?"US$"+fmtM(v).replace("$",""):fmtM(v))}/>
+              <Tooltip formatter={(v,n)=>metricaStock==="unidades"?[`${v} uds`,n]:metricaStock==="usd"?[`US$ ${Math.round(v).toLocaleString("es-AR")}`,n]:[fmt(v),n]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}} labelStyle={{color:G.text,fontWeight:700}}/>
               <Legend wrapperStyle={{fontSize:12,color:G.textSub}}/>
-              <Bar dataKey={metricaStock==="importe"?"importePropios":"propios"} name="Propios" fill={G.gold} stackId="a"/>
-              <Bar dataKey={metricaStock==="importe"?"importeConsig":"consignacion"} name="Consignación" fill={G.blue} stackId="a"/>
-              <Line type="monotone"dataKey={metricaStock==="importe"?"importe":"unidades"} name="Total" stroke={G.goldLight}strokeWidth={2}dot={{fill:G.gold,r:3}}/>
+              <Bar dataKey={metricaStock==="importe"?"importePropios":metricaStock==="usd"?"usdPropios":"propios"} name="Propios" fill={G.gold} stackId="a"/>
+              <Bar dataKey={metricaStock==="importe"?"importeConsig":metricaStock==="usd"?"usdConsig":"consignacion"} name="Consignación" fill={G.blue} stackId="a"/>
+              <Line type="monotone"dataKey={metricaStock==="importe"?"importe":metricaStock==="usd"?"usdTotal":"unidades"} name="Total" stroke={G.goldLight}strokeWidth={2}dot={{fill:G.gold,r:3}}/>
             </ComposedChart>
           </ResponsiveContainer>
         )}
       </Card>
+      {mesesOrdenados.length===0&&<Card style={{padding:16,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.3)"}}>
+        <span style={{color:G.blue,fontSize:12,fontWeight:600}}>💵 Cargá tipos de cambio mensuales (botón arriba) para ver también la evolución en dólares, calculada con el dólar real de cada mes.</span>
+      </Card>}
     </>}
 
     {vistaStock==="metricas"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
@@ -779,13 +819,37 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
       </Card>
     </div>}
 
+    <Modal open={modalTC} onClose={()=>setModalTC(false)} title="Tipos de cambio por mes" size="md">
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{color:G.textSub,fontSize:13,fontWeight:600}}>Cargá el valor del dólar de cada mes. El sistema usa el tipo de cambio correspondiente a cada mes histórico para calcular la evolución en USD con precisión.</div>
+        <div style={{background:G.input,borderRadius:12,padding:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,alignItems:"end"}}>
+            <Inp label="Mes" type="month" value={mesEditTC} onChange={e=>setMesEditTC(e.target.value)}/>
+            <NumInp label="Tipo de cambio ($ por US$)" value={valorEditTC} onChange={v=>setValorEditTC(v)} placeholder="0"/>
+            <Btn onClick={guardarTC} disabled={!mesEditTC||!valorEditTC}>Guardar</Btn>
+          </div>
+        </div>
+        {mesesOrdenados.length>0&&<div>
+          <div style={{fontWeight:700,color:G.textSub,fontSize:11,textTransform:"uppercase",marginBottom:8}}>Tipos de cambio cargados</div>
+          {mesesOrdenados.map(m=><div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:G.input,borderRadius:8,marginBottom:4}}>
+            <span style={{color:G.text,fontWeight:600}}>{mesL(m)}</span>
+            <div style={{display:"flex",gap:12,alignItems:"center"}}>
+              <span style={{color:G.gold,fontWeight:700,fontFamily:"monospace"}}>${tiposCambio[m].toLocaleString("es-AR")}</span>
+              <button onClick={()=>{setMesEditTC(m);setValorEditTC(tiposCambio[m].toString());}} style={{...s.btnGhost,padding:"4px 10px",fontSize:11}}>✎</button>
+            </div>
+          </div>)}
+        </div>}
+        <div style={{paddingTop:8,borderTop:`1px solid ${G.cardBorder}`}}><Btn onClick={()=>setModalTC(false)}>Listo</Btn></div>
+      </div>
+    </Modal>
+
     <Modal open={!!det}onClose={()=>setDet(null)}title={`${det?.patente} — ${det?.descripcion}`}size="lg">
       {det&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
           {[["Color",det.color||"—",G.textSub],["Año",det.anio||"—",G.textSub],["Modelo",det.modelo||"—",G.textSub],["Tenencia",det.tipo==="Consignación"?"Consignación":"Propio",det.tipo==="Consignación"?G.blue:G.gold]].map(([l,v,c])=><div key={l}style={{background:G.input,borderRadius:10,padding:10}}><div style={{fontSize:10,color:G.textSub,fontWeight:700,marginBottom:2}}>{l}</div><div style={{fontWeight:700,color:c,fontSize:13}}>{v}</div></div>)}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
-          {[["Costo/Precio mínimo",fmt(parseFloat(det.costo)||0),G.textSub],["Acondicionamiento",fmt(det.acond),G.amber],["Costo total",fmt(det.costo),G.text]].map(([l,v,c])=><div key={l}style={{background:G.input,borderRadius:10,padding:12}}><div style={{fontSize:11,color:G.textSub,fontWeight:700,marginBottom:4}}>{l}</div><div style={{fontWeight:800,color:c,fontSize:15}}>{v}</div></div>)}
+        <div style={{display:"grid",gridTemplateColumns:tcParaMes(det.fecha?.slice(0,7))>0?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:12}}>
+          {[["Costo/Precio mínimo",fmt(parseFloat(det.costo)||0),G.textSub],["Acondicionamiento",fmt(det.acond),G.amber],["Costo total",fmt(det.costo),G.text],...(tcParaMes(det.fecha?.slice(0,7))>0?[["Costo total USD",fmtUsd(det.costo,det.fecha?.slice(0,7)),G.blue]]:[])].map(([l,v,c])=><div key={l}style={{background:G.input,borderRadius:10,padding:12}}><div style={{fontSize:11,color:G.textSub,fontWeight:700,marginBottom:4}}>{l}</div><div style={{fontWeight:800,color:c,fontSize:15}}>{v}</div></div>)}
         </div>
         {det.gan!==null&&<div style={{background:det.gan>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",border:`1px solid ${det.gan>=0?"rgba(34,197,94,0.3)":"rgba(239,68,68,0.3)"}`,borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:13,color:G.textSub,fontWeight:600}}>Ganancia neta</span>
@@ -801,7 +865,6 @@ function SecStock({vehiculos,registros,onNuevo,onEditar}){
     </Modal>
   </div>;
 }
-
 
 function SecEstadoResultado({registros,vehiculos}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
@@ -1359,7 +1422,7 @@ function SecAnticipos({registros}) {
   );
 }
 
-function SecDashboard({registros,vehiculos}) {
+function SecDashboard({registros,vehiculos,tiposCambio={}}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().reverse();
   const [mes,setMes]=useState(mesesDisp[0]||new Date().toISOString().slice(0,7));
   const er=useMemo(()=>calcER(registros,mes,vehiculos),[registros,mes,vehiculos]);
@@ -1424,7 +1487,7 @@ function SecDashboard({registros,vehiculos}) {
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:12}}>
         <KPI label="CMV" value={fmtM(er.cmv)} color={G.red} sub={`${pct(er.cmv,er.ingresos)} de ingresos`}/>
-        <KPI label="Autos en stock" value={enStock.length.toString()} color={G.amber} sub={`Capital ${fmtM(valorStock)}`}/>
+        <KPI label="Autos en stock" value={enStock.length.toString()} color={G.amber} sub={(()=>{const mActual=hoy().slice(0,7);const mesesTC=Object.keys(tiposCambio).filter(m=>m<=mActual).sort();const tc=mesesTC.length>0?tiposCambio[mesesTC[mesesTC.length-1]]:0;return tc>0?`${fmtM(valorStock)} · US$ ${Math.round(valorStock/tc).toLocaleString("es-AR")}`:`Capital ${fmtM(valorStock)}`;})()}/>
         <KPI label="Ticket promedio" value={fmtM(ticketProm)} color={G.textSub} sub="por venta"/>
         <KPI label="Punto de equilibrio" value={fmtM(puntoEqPesos)} color={G.amber} sub={`≈ ${puntoEqAutos.toFixed(1)} autos/mes`}/>
         <KPI label="Cheques x cobrar" value={fmtM(totChqProx)} color={G.blue} sub="pendientes"/>
@@ -1546,6 +1609,7 @@ export default function App() {
   const [modVeh,setModVeh]=useState(false);
   const [regEditar,setRegEditar]=useState(null);
   const [vehEditar,setVehEditar]=useState(null);
+  const [tiposCambio,setTiposCambio]=useState({}); // {mes: valor}
   const [loading,setLoading]=useState(true);
 
   const dbVehToLocal=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",color:v.color||"",costo:v.costo,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacionOrigenId:v.operacion_origen_id,fechaVenta:v.fecha_venta,precioVenta:v.precio_venta,vendedor:v.vendedor||"",notas:v.notas||""});
@@ -1556,12 +1620,18 @@ export default function App() {
   useEffect(()=>{
     const cargar=async()=>{
       try{
-        const[{data:vData},{data:rData}]=await Promise.all([
+        const[{data:vData},{data:rData},{data:tcData}]=await Promise.all([
           supabase.from("vehiculos").select("*").order("fecha",{ascending:false}),
           supabase.from("registros").select("*").order("fecha",{ascending:false}),
+          supabase.from("tipos_cambio").select("*"),
         ]);
         if(vData)setVehiculos(vData.map(dbVehToLocal));
         if(rData)setRegistros(rData.map(dbRegToLocal));
+        if(tcData){
+          const map={};
+          tcData.forEach(t=>{map[t.mes]=t.valor;});
+          setTiposCambio(map);
+        }
       }catch(e){
         console.error("Error Supabase:",e);
       }finally{
@@ -1569,6 +1639,11 @@ export default function App() {
       }
     };
     cargar();
+  },[]);
+
+  const guardarTipoCambio=useCallback(async(mes,valor)=>{
+    await supabase.from("tipos_cambio").upsert({mes,valor:parseFloat(valor)||0});
+    setTiposCambio(p=>({...p,[mes]:parseFloat(valor)||0}));
   },[]);
 
   const saveRegistro=useCallback(async reg=>{
@@ -1659,9 +1734,9 @@ export default function App() {
       </aside>
       <main style={{flex:1,overflowY:"auto",background:G.bg}}>
         <div style={{maxWidth:1200,margin:"0 auto",padding:"32px"}}>
-          {tab==="dashboard"    && <SecDashboard     registros={registros} vehiculos={vehiculos}/>}
+          {tab==="dashboard"    && <SecDashboard     registros={registros} vehiculos={vehiculos} tiposCambio={tiposCambio}/>}
           {tab==="registros"    && <SecRegistros     registros={registros} vehiculos={vehiculos} onNuevo={()=>setModReg(true)} onEliminar={eliminarRegistro} onEditar={r=>{setRegEditar(r);setModReg(true);}}/> }
-          {tab==="stock"        && <SecStock         vehiculos={vehiculos} registros={registros} onNuevo={()=>setModVeh(true)} onEditar={v=>{setVehEditar(v);setModVeh(true);}}/>}
+          {tab==="stock"        && <SecStock         vehiculos={vehiculos} registros={registros} onNuevo={()=>setModVeh(true)} onEditar={v=>{setVehEditar(v);setModVeh(true);}} tiposCambio={tiposCambio} guardarTipoCambio={guardarTipoCambio}/>}
           {tab==="resultado"    && <SecEstadoResultado registros={registros} vehiculos={vehiculos}/>}
           {tab==="rentabilidad" && <SecRentabilidad  vehiculos={vehiculos} registros={registros}/>}
           {tab==="flujo"        && <SecFlujo         registros={registros}/>}
