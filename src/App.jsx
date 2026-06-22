@@ -574,7 +574,7 @@ function calcER(registros, mes, vehiculos=[]) {
   const vendidosEsteMes = vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta?.startsWith(mes));
   const cmv = vendidosEsteMes.reduce((sum,v)=>{
     const costoCompra = parseFloat(v.costo)||0;
-    const acond = registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&PLAN[r.cuenta]?.esVehiculo).reduce((s,r)=>s+r.importe,0);
+    const acond = registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&PLAN[r.cuenta]?.esVehiculo&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((s,r)=>s+r.importe,0);
     return sum + costoCompra + acond;
   },0);
 
@@ -688,7 +688,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
   };
 
   const vCC=vehiculos.map(v=>{
-    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso);
+    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2");
     const acond=gs.reduce((s,r)=>s+r.importe,0);
     const ce=parseFloat(v.costo)||0;
     const costo=ce+acond;
@@ -722,7 +722,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
     });
   },[vehiculos,registros,tiposCambio]);
 
-  const porModelo=useMemo(()=>{const map={};vehiculos.filter(v=>v.estado==="Vendido").forEach(v=>{const k=v.modelo||"Sin modelo";if(!map[k])map[k]={nombre:k,cantidad:0,ganancia:0};const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso).reduce((s,r)=>s+r.importe,0);const ct=(parseFloat(v.costo)||0)+gs;map[k].cantidad++;map[k].ganancia+=((parseFloat(v.precioVenta)||0)-ct);});return Object.values(map).sort((a,b)=>b.cantidad-a.cantidad);},[vehiculos,registros]);
+  const porModelo=useMemo(()=>{const map={};vehiculos.filter(v=>v.estado==="Vendido").forEach(v=>{const k=v.modelo||"Sin modelo";if(!map[k])map[k]={nombre:k,cantidad:0,ganancia:0};const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((s,r)=>s+r.importe,0);const ct=(parseFloat(v.costo)||0)+gs;map[k].cantidad++;map[k].ganancia+=((parseFloat(v.precioVenta)||0)-ct);});return Object.values(map).sort((a,b)=>b.cantidad-a.cantidad);},[vehiculos,registros]);
   const porColor=useMemo(()=>{const map={};vehiculos.filter(v=>v.estado==="Vendido"&&v.color).forEach(v=>{const k=v.color;if(!map[k])map[k]={nombre:k,cantidad:0};map[k].cantidad++;});return Object.values(map).sort((a,b)=>b.cantidad-a.cantidad);},[vehiculos]);
 
   const mesesOrdenados=Object.keys(tiposCambio).sort().reverse();
@@ -1045,7 +1045,7 @@ function SecRentabilidad({vehiculos,registros}) {
   const [vista,setVista]=useState("vehiculos");
   const [detOp,setDetOp]=useState(null);
   const vV=vehiculos.filter(v=>v.estado==="Vendido").map(v=>{
-    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso);
+    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2");
     const acond=gs.reduce((s,r)=>s+r.importe,0);
     const ce=parseFloat(v.costo)||0;
     const ct=ce+acond;
@@ -1486,7 +1486,7 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
     return Object.values(map).sort((a,b)=>b.ventas-a.ventas).slice(0,5);
   },[registros,mes]);
   const top5=useMemo(()=>vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta?.startsWith(mes)).map(v=>{
-    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso).reduce((s,r)=>s+r.importe,0);
+    const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((s,r)=>s+r.importe,0);
     const ct=(parseFloat(v.costo)||0)+gs;
     const pv=parseFloat(v.precioVenta)||0;
     return {...v,gan:pv-ct,pv};
