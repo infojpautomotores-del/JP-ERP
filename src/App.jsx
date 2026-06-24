@@ -270,9 +270,20 @@ function FormasPagoForm({formas, setFormas, total, allowEspecie=false}) {
               <select style={{...s.inp,marginBottom:8}} value={f.banco} onChange={e=>upd(f.id,"banco",e.target.value)}><option value="">Banco</option>{BANCOS.map(b=><option key={b}>{b}</option>)}</select>
             )}
             {f.tipo==="Especie (vehículo)" && (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                <input style={s.inp} placeholder="Patente" value={f.patente} onChange={e=>upd(f.id,"patente",e.target.value.toUpperCase())}/>
-                <input style={s.inp} placeholder="Marca / Modelo / Año" value={f.descVeh} onChange={e=>upd(f.id,"descVeh",e.target.value)}/>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8,padding:"10px",background:"rgba(245,197,24,0.05)",border:`1px solid ${G.goldBorder}`,borderRadius:8}}>
+                <div style={{fontSize:11,fontWeight:800,color:G.gold,textTransform:"uppercase",letterSpacing:"0.05em"}}>Datos del auto recibido</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <input style={s.inp} placeholder="Patente *" value={f.patente} onChange={e=>upd(f.id,"patente",e.target.value.toUpperCase())}/>
+                  <input style={s.inp} placeholder="Marca" value={f.marca||""} onChange={e=>upd(f.id,"marca",e.target.value)}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <input style={s.inp} placeholder="Modelo" value={f.modelo||""} onChange={e=>upd(f.id,"modelo",e.target.value)}/>
+                  <input style={s.inp} placeholder="Año" inputMode="numeric" value={f.anio||""} onChange={e=>upd(f.id,"anio",e.target.value.replace(/[^0-9]/g,""))}/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <input style={s.inp} placeholder="Color" value={f.color||""} onChange={e=>upd(f.id,"color",e.target.value)}/>
+                  <div style={{fontSize:11,color:G.textDim,alignSelf:"center"}}>Valor: usá el campo "Importe" de arriba</div>
+                </div>
               </div>
             )}
             <div style={{display:"flex",justifyContent:"flex-end"}}>
@@ -1705,7 +1716,8 @@ export default function App() {
         setVehiculos(p=>p.map(v=>v.id===r.vehiculoId?{...v,estado:"Vendido",precioVenta:r.importe,vendedor:r.vendedor,fechaVenta:r.fecha}:v));
       }
       (r.formas||[]).filter(f=>f.tipo==="Especie (vehículo)"&&f.patente).forEach(async f=>{
-        const nv={id:uid(),patente:f.patente,descripcion:f.descVeh||f.patente,costo:f.importe,tipo:"Parte de pago",fecha:r.fecha,estado:"En stock",operacionOrigenId:r.vehiculoId||r.id,fechaVenta:null,precioVenta:null,color:"",marca:"",modelo:"",anio:""};
+        const desc=[f.marca,f.modelo,f.anio].filter(Boolean).join(" ")||f.descVeh||f.patente;
+        const nv={id:uid(),patente:f.patente,descripcion:desc,costo:f.importe,tipo:"Parte de pago",fecha:r.fecha,estado:"En stock",operacionOrigenId:r.vehiculoId||r.id,fechaVenta:null,precioVenta:null,color:f.color||"",marca:f.marca||"",modelo:f.modelo||"",anio:f.anio||""};
         await supabase.from("vehiculos").insert([localVehToDB(nv)]);
         setVehiculos(p=>[...p,nv]);
       });
@@ -1731,9 +1743,25 @@ export default function App() {
 
 
   const eliminarRegistro=useCallback(async id=>{
+    const reg=registros.find(r=>r.id===id);
     await supabase.from("registros").delete().eq("id",id);
     setRegistros(p=>p.filter(r=>r.id!==id));
-  },[]);
+    // Si el registro era una venta (ingreso vinculado a un vehículo), revertir el auto a En stock
+    if(reg&&reg.esIngreso&&reg.vehiculoId&&reg.vehiculoId!=="__na__"){
+      await supabase.from("vehiculos").update({estado:"En stock",precio_venta:null,vendedor:null,fecha_venta:null}).eq("id",reg.vehiculoId);
+      setVehiculos(p=>p.map(v=>v.id===reg.vehiculoId?{...v,estado:"En stock",precioVenta:null,vendedor:null,fechaVenta:null}:v));
+      // Eliminar los autos que entraron como parte de pago (especie) en esta venta
+      const idsOrigen=[reg.vehiculoId,reg.id];
+      const especies=vehiculos.filter(v=>v.tipo==="Parte de pago"&&idsOrigen.includes(v.operacionOrigenId));
+      for(const e of especies){
+        await supabase.from("vehiculos").delete().eq("id",e.id);
+      }
+      if(especies.length>0){
+        const idsEsp=especies.map(e=>e.id);
+        setVehiculos(p=>p.filter(v=>!idsEsp.includes(v.id)));
+      }
+    }
+  },[registros,vehiculos]);
   const tabActivo={background:G.goldDim,color:G.gold,border:`1px solid ${G.goldBorder}`,fontWeight:800};
   const tabInactivo={background:"transparent",color:G.textDim,border:"1px solid transparent",fontWeight:600};
 
