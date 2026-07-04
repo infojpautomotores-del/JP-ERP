@@ -389,7 +389,12 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
     setMostrarLista(false);
   };
 
-  const vehiculosDisponibles = vehiculos.filter(v=>v.estado==="En stock"&&(!patente||v.patente.includes(patente)));
+  const vehiculosDisponibles = vehiculos.filter(v=>{
+    if(v.estado!=="En stock")return false;
+    if(!patente)return true;
+    const q=patente.toLowerCase();
+    return (v.patente||"").toLowerCase().includes(q)||(v.marca||"").toLowerCase().includes(q)||(v.modelo||"").toLowerCase().includes(q)||(v.descripcion||"").toLowerCase().includes(q);
+  });
 
   const reset = () => {
     setTipo("Venta de vehículo");setFecha(hoy());setDesc("");setCuenta("1.1");
@@ -449,7 +454,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
           <div style={{display:"grid",gridTemplateColumns:esVenta?"1fr 1fr":"1fr",gap:12,alignItems:"start"}}>
             <div style={{display:"flex",flexDirection:"column",gap:8,position:"relative"}}>
               <Inp label={esVenta?"Patente vehículo vendido":esCompra?"Patente vehículo comprado":"Patente vehículo asociado"}
-                placeholder="Ej: AA123BC o elegí de la lista" value={patente} maxLength={8}
+                placeholder="Buscá por patente o marca (ej: Ford)" value={patente} maxLength={20}
                 style={{textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:700}}
                 onChange={e=>handlePatente(e.target.value)}
                 onFocus={()=>setMostrarLista(true)}
@@ -677,8 +682,9 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
   );
 }
 
-function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoCambio}){
+function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,guardarTipoCambio}){
   const [filtro,setFiltro]=useState("En stock");
+  const [orden,setOrden]=useState("");
   const [det,setDet]=useState(null);
   const [vistaStock,setVistaStock]=useState("lista");
   const [metricaStock,setMetricaStock]=useState("unidades");
@@ -711,6 +717,11 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
     if(filtro==="Consignación")return v.estado==="En stock"&&v.tipo==="Consignación";
     if(filtro==="En stock")return v.estado==="En stock"&&v.tipo!=="Consignación";
     return v.estado===filtro;
+  }).sort((a,b)=>{
+    if(orden==="marca")return (a.marca||a.descripcion||"").localeCompare(b.marca||b.descripcion||"");
+    if(orden==="costo")return b.costo-a.costo;
+    if(orden==="anio")return (b.anio||"").localeCompare(a.anio||"");
+    return 0;
   });
   const valorStock=vCC.filter(v=>v.estado==="En stock").reduce((s,v)=>s+v.costo,0);
   const propios=vCC.filter(v=>v.estado==="En stock"&&v.tipo!=="Consignación");
@@ -788,7 +799,15 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
 
     {vistaStock==="lista"&&<>
       <Card style={{padding:12,marginBottom:16}}>
-        <div style={{display:"flex",gap:8}}>{["","En stock","Consignación","Reservado","Vendido"].map(e=><button key={e}onClick={()=>setFiltro(e)}style={{padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:filtro===e?G.gold:G.input,color:filtro===e?"#000":G.textSub}}>{e||"Todos"}</button>)}</div>
+        <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{["","En stock","Consignación","Reservado","Vendido"].map(e=><button key={e}onClick={()=>setFiltro(e)}style={{padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:filtro===e?G.gold:G.input,color:filtro===e?"#000":G.textSub}}>{e||"Todos"}</button>)}</div>
+          <select value={orden} onChange={e=>setOrden(e.target.value)} style={{...s.inp,maxWidth:180}}>
+            <option value="">Orden: por defecto</option>
+            <option value="marca">Ordenar por marca (A-Z)</option>
+            <option value="costo">Ordenar por costo (mayor)</option>
+            <option value="anio">Ordenar por año (nuevo)</option>
+          </select>
+        </div>
       </Card>
       <Card>
         <div style={{overflowX:"auto"}}>
@@ -809,7 +828,12 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,tiposCambio,guardarTipoC
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",color:G.green,fontWeight:700}}>{v.precioVenta?fmt(v.precioVenta):"—"}</td>
                 <td style={{padding:"10px",textAlign:"right",fontFamily:"monospace",fontWeight:800,color:v.gan>0?G.green:v.gan<0?G.red:G.textSub}}>{v.gan!==null?fmt(v.gan):"—"}</td>
                 <td style={{padding:"10px"}}><Badge color={ecol[v.estado]}>{v.estado}</Badge></td>
-                <td style={{padding:"10px"}}><button onClick={e=>{e.stopPropagation();onEditar&&onEditar(v);}}style={{...s.btnGhost,padding:"4px 10px",fontSize:11}}>✎</button></td>
+                <td style={{padding:"10px"}}>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={e=>{e.stopPropagation();onEditar&&onEditar(v);}}style={{...s.btnGhost,padding:"4px 10px",fontSize:11}}>✎</button>
+                    <button onClick={e=>{e.stopPropagation();if(window.confirm(`¿Eliminar ${v.patente||"este auto"}?\n\nSe borrará el auto y sus registros asociados (compra, acondicionamientos). Esta acción no se puede deshacer.`))onEliminar&&onEliminar(v);}}style={{background:"transparent",border:`1px solid ${G.red}`,borderRadius:6,color:G.red,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F}}>✕</button>
+                  </div>
+                </td>
               </tr>)}
             </tbody>
           </table>
@@ -1514,14 +1538,111 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
   const dif=(a,b)=>b!==null?a-b:undefined;
   const difP=(a,b)=>b!==null&&b!==0?((a-b)/Math.abs(b)*100):undefined;
 
+  const exportarAnalisis=()=>{
+    const esc=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?'"'+s.replace(/"/g,'""')+'"':s;};
+    const fila=arr=>arr.map(esc).join(",");
+    const L=[];
+    const hoyF=hoy();
+    // ===== ENCABEZADO =====
+    L.push(fila(["JP AUTOMOTORES — ANALISIS DE NEGOCIO"]));
+    L.push(fila(["Generado el",hoyF,"Mes analizado",mesL(mes)]));
+    L.push("");
+    // ===== RESUMEN EJECUTIVO =====
+    L.push(fila(["=== RESUMEN EJECUTIVO (mes "+mesL(mes)+") ==="]));
+    L.push(fila(["Indicador","Valor"]));
+    L.push(fila(["Autos vendidos en el mes",vMes.length]));
+    L.push(fila(["Ingresos",Math.round(er.ingresos)]));
+    L.push(fila(["Costo de mercaderia (CMV)",Math.round(er.cmv)]));
+    L.push(fila(["Ganancia bruta",Math.round(er.gBruta)]));
+    L.push(fila(["Margen bruto %",er.ingresos>0?(er.gBruta/er.ingresos*100).toFixed(1):"0"]));
+    L.push(fila(["Resultado neto",Math.round(er.resNeto)]));
+    L.push(fila(["Margen neto %",er.ingresos>0?(er.resNeto/er.ingresos*100).toFixed(1):"0"]));
+    L.push(fila(["Ticket promedio",Math.round(ticketProm)]));
+    L.push(fila(["Gastos fijos",Math.round(gastosFijos)]));
+    L.push(fila(["Punto equilibrio (autos)",puntoEqAutos.toFixed(1)]));
+    L.push("");
+    // ===== SITUACION DE STOCK =====
+    L.push(fila(["=== STOCK ACTUAL ==="]));
+    L.push(fila(["Indicador","Valor"]));
+    L.push(fila(["Autos en stock",enStock.length]));
+    L.push(fila(["  - Propios",propiosDash]));
+    L.push(fila(["  - Consignacion",consigDash]));
+    L.push(fila(["Capital en stock (costo)",Math.round(valorStock)]));
+    L.push(fila(["Cheques a cobrar (futuros)",Math.round(totChqProx)]));
+    L.push("");
+    // ===== DETALLE POR AUTO (todos) =====
+    L.push(fila(["=== DETALLE POR AUTO ==="]));
+    L.push(fila(["Patente","Descripcion","Marca","Modelo","Anio","Tenencia","Estado","Costo","Acond.","Costo total","Precio venta","Ganancia","Margen %","Fecha ingreso","Fecha venta","Dias en stock"]));
+    vehiculos.forEach(v=>{
+      const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2");
+      const acond=gs.reduce((s,r)=>s+r.importe,0);
+      const ce=parseFloat(v.costo)||0;
+      const ct=ce+acond;
+      const pv=parseFloat(v.precioVenta)||0;
+      const gan=v.estado==="Vendido"?(pv-ct):"";
+      const margen=v.estado==="Vendido"&&pv>0?((pv-ct)/pv*100).toFixed(1):"";
+      const ten=v.tipo==="Consignación"?"Consignacion":"Propio";
+      const fIng=v.fecha||"";
+      const fVen=v.fechaVenta||"";
+      const dias=fIng?Math.round((new Date(fVen||hoyF)-new Date(fIng))/86400000):"";
+      L.push(fila([v.patente,v.descripcion,v.marca,v.modelo,v.anio,ten,v.estado,Math.round(ce),Math.round(acond),Math.round(ct),pv?Math.round(pv):"",gan!==""?Math.round(gan):"",margen,fIng,fVen,dias]));
+    });
+    L.push("");
+    // ===== RENTABILIDAD POR MODELO =====
+    L.push(fila(["=== RENTABILIDAD POR MODELO (vendidos) ==="]));
+    L.push(fila(["Modelo","Cantidad vendida","Ganancia total","Ganancia promedio"]));
+    const mapMod={};
+    vehiculos.filter(v=>v.estado==="Vendido").forEach(v=>{
+      const k=v.modelo||v.descripcion||"Sin modelo";
+      if(!mapMod[k])mapMod[k]={cant:0,gan:0};
+      const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((s,r)=>s+r.importe,0);
+      const ct=(parseFloat(v.costo)||0)+gs;
+      mapMod[k].cant++;mapMod[k].gan+=((parseFloat(v.precioVenta)||0)-ct);
+    });
+    Object.entries(mapMod).sort((a,b)=>b[1].gan-a[1].gan).forEach(([k,d])=>{
+      L.push(fila([k,d.cant,Math.round(d.gan),Math.round(d.gan/d.cant)]));
+    });
+    L.push("");
+    // ===== ESTADO DE RESULTADO DEL MES =====
+    L.push(fila(["=== ESTADO DE RESULTADO ("+mesL(mes)+") ==="]));
+    L.push(fila(["Concepto","Monto"]));
+    L.push(fila(["Ingresos",Math.round(er.ingresos)]));
+    L.push(fila(["Costo de Mercaderia",-Math.round(er.cmv)]));
+    L.push(fila(["GANANCIA BRUTA",Math.round(er.gBruta)]));
+    L.push(fila(["Gastos Comercializacion",-Math.round(er.comercial)]));
+    L.push(fila(["Gastos Administracion",-Math.round(er.admin)]));
+    L.push(fila(["Gastos Impositivos",-Math.round(er.impositivos)]));
+    L.push(fila(["Gastos Bancarios",-Math.round(er.bancarios)]));
+    L.push(fila(["Extraordinarios",-Math.round(er.extraordinarios)]));
+    L.push(fila(["RESULTADO NETO",Math.round(er.resNeto)]));
+    L.push("");
+    // ===== TODOS LOS REGISTROS =====
+    L.push(fila(["=== REGISTROS (movimientos crudos) ==="]));
+    L.push(fila(["Fecha","Tipo","Cuenta","Descripcion","Vehiculo","Vendedor","Importe","Es ingreso"]));
+    registros.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")).forEach(r=>{
+      L.push(fila([r.fecha,r.tipo,r.cuenta,r.descripcion,r.vehiculoId==="__na__"?"":r.vehiculoId,r.vendedor,Math.round(parseFloat(r.importe)||0),r.esIngreso?"SI":"NO"]));
+    });
+    // Descargar con BOM para que Excel respete acentos
+    const csv="\uFEFF"+L.join("\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="JP-Automotores-Analisis-"+mes+".csv";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Dashboard</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Métricas clave del negocio</p></div>
-        <select style={s.inp} value={mes} onChange={e=>setMes(e.target.value)}>
-          {mesesDisp.length===0&&<option value={mes}>{mes}</option>}
-          {mesesDisp.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
-        </select>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <Btn onClick={exportarAnalisis} variant="ghost" size="md">⬇ Exportar análisis</Btn>
+          <select style={s.inp} value={mes} onChange={e=>setMes(e.target.value)}>
+            {mesesDisp.length===0&&<option value={mes}>{mes}</option>}
+            {mesesDisp.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
+          </select>
+        </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:12}}>
         <KPI label="Autos vendidos" value={vMes.length.toString()} color={G.text} varAbs={dif(vMes.length,erPrev?vMesPrev.length:null)} varPct={difP(vMes.length,erPrev?vMesPrev.length:null)} sub="unidades"/>
@@ -1762,6 +1883,20 @@ export default function App() {
       }
     }
   },[registros,vehiculos]);
+  const eliminarVehiculo=useCallback(async v=>{
+    // Borrar el vehículo
+    await supabase.from("vehiculos").delete().eq("id",v.id);
+    setVehiculos(p=>p.filter(x=>x.id!==v.id));
+    // Borrar los registros asociados a ese vehículo (compra automática, acondicionamientos, etc.)
+    const regsAsoc=registros.filter(r=>r.vehiculoId===v.id);
+    for(const r of regsAsoc){
+      await supabase.from("registros").delete().eq("id",r.id);
+    }
+    if(regsAsoc.length>0){
+      const ids=regsAsoc.map(r=>r.id);
+      setRegistros(p=>p.filter(r=>!ids.includes(r.id)));
+    }
+  },[registros]);
   const tabActivo={background:G.goldDim,color:G.gold,border:`1px solid ${G.goldBorder}`,fontWeight:800};
   const tabInactivo={background:"transparent",color:G.textDim,border:"1px solid transparent",fontWeight:600};
 
@@ -1797,7 +1932,7 @@ export default function App() {
         <div style={{maxWidth:1200,margin:"0 auto",padding:"32px"}}>
           {tab==="dashboard"    && <SecDashboard     registros={registros} vehiculos={vehiculos} tiposCambio={tiposCambio}/>}
           {tab==="registros"    && <SecRegistros     registros={registros} vehiculos={vehiculos} onNuevo={()=>setModReg(true)} onEliminar={eliminarRegistro} onEditar={r=>{setRegEditar(r);setModReg(true);}}/> }
-          {tab==="stock"        && <SecStock         vehiculos={vehiculos} registros={registros} onNuevo={()=>setModVeh(true)} onEditar={v=>{setVehEditar(v);setModVeh(true);}} tiposCambio={tiposCambio} guardarTipoCambio={guardarTipoCambio}/>}
+          {tab==="stock"        && <SecStock         vehiculos={vehiculos} registros={registros} onNuevo={()=>setModVeh(true)} onEditar={v=>{setVehEditar(v);setModVeh(true);}} onEliminar={eliminarVehiculo} tiposCambio={tiposCambio} guardarTipoCambio={guardarTipoCambio}/>}
           {tab==="resultado"    && <SecEstadoResultado registros={registros} vehiculos={vehiculos}/>}
           {tab==="rentabilidad" && <SecRentabilidad  vehiculos={vehiculos} registros={registros}/>}
           {tab==="flujo"        && <SecFlujo         registros={registros}/>}
