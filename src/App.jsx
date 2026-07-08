@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { supabase } from "./supabase";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, ComposedChart } from "recharts";
 
@@ -614,10 +614,17 @@ function calcER(registros, mes, vehiculos=[]) {
       detalle[c.codigo]=regs.filter(r=>r.cuenta===c.codigo).reduce((s,r)=>s+r.importe,0);
     }
   });
-  // Detalle especial de CMV: separar costo de compra vs acondicionamiento de los vendidos este mes
+  // Detalle de CMV: costo de compra + cada subcuenta de acondicionamiento, solo de los vendidos este mes
+  const idsVendidos = vendidosEsteMes.map(v=>v.id);
   const cmvCompra = vendidosEsteMes.reduce((s,v)=>s+(parseFloat(v.costo)||0),0);
+  detalle["2.1"]=cmvCompra; // costo de compra agregado de los vendidos este mes
+  // Cada acondicionamiento (2.3 a 2.12) desglosado, contando solo los gastos de autos vendidos este mes
+  Object.values(PLAN).forEach(c=>{
+    if(c.esVehiculo&&c.codigo!=="2.1"&&c.codigo!=="2.2"){
+      detalle[c.codigo]=registros.filter(r=>idsVendidos.includes(r.vehiculoId)&&!r.esIngreso&&r.cuenta===c.codigo).reduce((s,r)=>s+r.importe,0);
+    }
+  });
   const cmvAcond = cmv - cmvCompra;
-  detalle["2.1"]=cmvCompra; // mostramos el costo de compra agregado acá para visibilidad
   detalle["__cmv_acond"]=cmvAcond;
   return {ingresos,cmv,gBruta,comercial,resComercial,admin,ebitda,impositivos,bancarios,resAntesExtr,extraordinarios,resNeto,retiro,resDespRetiro,detalle,regs,vendidosEsteMes};
 }
@@ -1030,11 +1037,23 @@ function SecEstadoResultado({registros,vehiculos}) {
                 const pctVal=er.ingresos>0?(val/er.ingresos*100):0;
                 const sub=isSubtotal(k);
                 const color=k==="ingresos"?G.green:isCosto(k)?G.red:sub?(val>=0?G.green:G.red):G.text;
-                return <tr key={k} style={{borderBottom:`1px solid ${G.cardBorder}`,background:sub?G.input:"transparent"}}>
-                  <td style={{padding:"10px 16px",paddingLeft:sub?"16px":"32px",color:sub?G.text:G.textSub,fontWeight:sub?800:600,fontSize:sub?13:12}}>{erLabels[k]}</td>
-                  <td style={{padding:"10px 16px",textAlign:"right",fontFamily:"monospace",fontWeight:sub?900:700,color,fontSize:sub?15:13}}>{isCosto(k)&&val>0?`(${fmt(val)})`:fmt(val)}</td>
-                  <td style={{padding:"10px 16px",textAlign:"right",fontSize:11,fontWeight:700,color:pctVal>20?G.red:pctVal>10?G.amber:G.textSub}}>{pctVal.toFixed(1)}%</td>
-                </tr>;
+                const subCuentasCMV=k==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&(er.detalle[c.codigo]||0)!==0):[];
+                return <Fragment key={k}>
+                  <tr style={{borderBottom:`1px solid ${G.cardBorder}`,background:sub?G.input:"transparent"}}>
+                    <td style={{padding:"10px 16px",paddingLeft:sub?"16px":"32px",color:sub?G.text:G.textSub,fontWeight:sub?800:600,fontSize:sub?13:12}}>{erLabels[k]}</td>
+                    <td style={{padding:"10px 16px",textAlign:"right",fontFamily:"monospace",fontWeight:sub?900:700,color,fontSize:sub?15:13}}>{isCosto(k)&&val>0?`(${fmt(val)})`:fmt(val)}</td>
+                    <td style={{padding:"10px 16px",textAlign:"right",fontSize:11,fontWeight:700,color:pctVal>20?G.red:pctVal>10?G.amber:G.textSub}}>{pctVal.toFixed(1)}%</td>
+                  </tr>
+                  {subCuentasCMV.map(c=>{
+                    const sv=er.detalle[c.codigo]||0;
+                    const sp=er.ingresos>0?(sv/er.ingresos*100):0;
+                    return <tr key={c.codigo} style={{borderBottom:`1px solid ${G.cardBorder}`}}>
+                      <td style={{padding:"6px 16px 6px 48px",color:G.textDim,fontWeight:600,fontSize:11}}>{c.codigo} — {c.nombre}</td>
+                      <td style={{padding:"6px 16px",textAlign:"right",fontFamily:"monospace",fontWeight:600,color:G.red+"bb",fontSize:12}}>{fmt(sv)}</td>
+                      <td style={{padding:"6px 16px",textAlign:"right",fontSize:10,fontWeight:600,color:G.textDim}}>{sp.toFixed(1)}%</td>
+                    </tr>;
+                  })}
+                </Fragment>;
               })}
             </tbody>
           </table>
@@ -1050,8 +1069,10 @@ function SecEstadoResultado({registros,vehiculos}) {
                 {erMeses.map(m=><th key={m.mes} style={{padding:"12px 12px",textAlign:"right",minWidth:130,color:m.mes===mes?G.gold:G.textSub,fontWeight:m.mes===mes?800:700,fontSize:11}}>{mesL(m.mes)}</th>)}
               </tr></thead>
               <tbody>
-                {erKeys.map(fila=>(
-                  <tr key={fila} style={{borderBottom:`1px solid ${G.cardBorder}`,background:isSubtotal(fila)?G.input:"transparent"}}>
+                {erKeys.map(fila=>{
+                  const subCuentasCMV=fila==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&erMeses.some(m=>(m.detalle?.[c.codigo]||0)!==0)):[];
+                  return <Fragment key={fila}>
+                  <tr style={{borderBottom:`1px solid ${G.cardBorder}`,background:isSubtotal(fila)?G.input:"transparent"}}>
                     <td style={{padding:"8px 16px",paddingLeft:isSubtotal(fila)?"16px":"32px",color:isSubtotal(fila)?G.text:G.textSub,fontWeight:isSubtotal(fila)?800:600,fontSize:isSubtotal(fila)?12:11}}>{erLabels[fila]}</td>
                     {erMeses.map((m,mi)=>{
                       const val=m[fila]||0;
@@ -1066,7 +1087,19 @@ function SecEstadoResultado({registros,vehiculos}) {
                       </td>;
                     })}
                   </tr>
-                ))}
+                  {subCuentasCMV.map(c=>(
+                    <tr key={c.codigo} style={{borderBottom:`1px solid ${G.cardBorder}`}}>
+                      <td style={{padding:"6px 16px 6px 48px",color:G.textDim,fontWeight:600,fontSize:10}}>{c.codigo} — {c.nombre}</td>
+                      {erMeses.map(m=>{
+                        const sv=m.detalle?.[c.codigo]||0;
+                        return <td key={m.mes} style={{padding:"6px 12px",textAlign:"right",background:m.mes===mes?"rgba(212,160,23,0.04)":"transparent"}}>
+                          <div style={{fontFamily:"monospace",fontWeight:600,color:G.red+"bb",fontSize:11}}>{fmt(sv)}</div>
+                        </td>;
+                      })}
+                    </tr>
+                  ))}
+                  </Fragment>;
+                })}
               </tbody>
             </table>
           </div>
@@ -1181,15 +1214,15 @@ function SecRentabilidad({vehiculos,registros}) {
                         <span style={{fontFamily:"monospace",fontWeight:800,color:G.text}}>{v.patente}</span>
                         <span style={{color:G.textSub,fontSize:13,fontWeight:600}}>{v.descripcion}</span>
                       </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-                        {[["Costo entrada",fmt(parseFloat(v.costo)),G.textSub],["Acondicionamiento",fmt(v.acond),G.amber],["Precio venta",fmt(v.pv),G.green],["Ganancia",fmt(v.gan),v.gan>=0?G.green:G.red]].map(([l,val,c])=>(
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:12}}>
+                        {[["Costo entrada",fmt(parseFloat(v.costo)),G.textSub],["Acondicionamiento",fmt(v.acond),G.amber],["Precio venta",fmt(v.pv),G.green],["Ganancia",fmt(v.gan),v.gan>=0?G.green:G.red],["Margen %",pct(v.gan,v.pv),v.pv>0?(v.gan/v.pv*100>=10?G.green:v.gan/v.pv*100>=5?G.amber:G.red):G.textSub]].map(([l,val,c])=>(
                           <div key={l}><div style={{fontSize:11,color:G.textSub,fontWeight:700,marginBottom:2}}>{l}</div><div style={{fontFamily:"monospace",fontWeight:800,color:c}}>{val}</div></div>
                         ))}
                       </div>
                     </div>
                   ))}
-                  <div style={{background:G.card,borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,textAlign:"center"}}>
-                    {[["Ingresos totales",fmt(op.totI),G.green],["Costos totales",fmt(op.totC),G.red],["Ganancia combinada",fmt(op.ganTotal),op.ganTotal>=0?G.green:G.red]].map(([l,v,c])=>(
+                  <div style={{background:G.card,borderRadius:12,padding:16,display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,textAlign:"center"}}>
+                    {[["Ingresos totales",fmt(op.totI),G.green],["Costos totales",fmt(op.totC),G.red],["Ganancia combinada",fmt(op.ganTotal),op.ganTotal>=0?G.green:G.red],["Margen combinado",pct(op.ganTotal,op.totI),op.totI>0?(op.ganTotal/op.totI*100>=10?G.green:op.ganTotal/op.totI*100>=5?G.amber:G.red):G.textSub]].map(([l,v,c])=>(
                       <div key={l}><div style={{fontSize:11,color:G.textSub,fontWeight:700,marginBottom:4}}>{l}</div><div style={{fontFamily:"monospace",fontWeight:900,fontSize:18,color:c}}>{v}</div></div>
                     ))}
                   </div>
