@@ -946,6 +946,7 @@ function SecEstadoResultado({registros,vehiculos}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
   const [mes,setMes]=useState(mesesDisp[0]||new Date().toISOString().slice(0,7));
   const [vista,setVista]=useState("cascada");
+  const [ordenER,setOrdenER]=useState("cuenta");
   const [expandidos,setExpandidos]=useState({});
   const toggleExp=g=>setExpandidos(p=>({...p,[g]:!p[g]}));
   const ultimos12=useMemo(()=>[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().slice(-12),[registros]);
@@ -973,6 +974,10 @@ function SecEstadoResultado({registros,vehiculos}) {
             {mesesDisp.length===0&&<option value={mes}>{mes}</option>}
             {mesesDisp.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
           </select>
+          <select style={s.inp} value={ordenER} onChange={e=>setOrdenER(e.target.value)} title="Orden del desglose de cuentas">
+            <option value="cuenta">Orden: por cuenta</option>
+            <option value="monto">Orden: por monto (mayor)</option>
+          </select>
           <div style={{display:"flex",background:G.input,borderRadius:10,padding:4,gap:2}}>
             {vistaBtns.map(t=><button key={t.v} onClick={()=>setVista(t.v)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vista===t.v?G.gold:"transparent",color:vista===t.v?"#000":G.textSub}}>{t.l}</button>)}
           </div>
@@ -991,7 +996,7 @@ function SecEstadoResultado({registros,vehiculos}) {
       {vista==="cascada"&&(
         <Card style={{padding:24}}>
           {GRUPOS_ER.map(grupo=>{
-            const cuentasG=Object.values(PLAN).filter(c=>c.grupo===grupo.key);
+            const cuentasG=Object.values(PLAN).filter(c=>c.grupo===grupo.key).sort((a,b)=>ordenER==="monto"?(er.detalle[b.codigo]||0)-(er.detalle[a.codigo]||0):0);
             const totalG=cuentasG.reduce((s,c)=>s+(er.detalle[c.codigo]||0),0);
             const isExp=expandidos[grupo.key];
             const st=SUBTOTALES[grupo.key];
@@ -1038,7 +1043,7 @@ function SecEstadoResultado({registros,vehiculos}) {
                 const pctVal=er.ingresos>0?(val/er.ingresos*100):0;
                 const sub=isSubtotal(k);
                 const color=k==="ingresos"?G.green:isCosto(k)?G.red:sub?(val>=0?G.green:G.red):G.text;
-                const subCuentasCMV=k==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&(er.detalle[c.codigo]||0)!==0):[];
+                const subCuentasCMV=k==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&(er.detalle[c.codigo]||0)!==0).sort((a,b)=>ordenER==="monto"?(er.detalle[b.codigo]||0)-(er.detalle[a.codigo]||0):0):[];
                 return <Fragment key={k}>
                   <tr style={{borderBottom:`1px solid ${G.cardBorder}`,background:sub?G.input:"transparent"}}>
                     <td style={{padding:"10px 16px",paddingLeft:sub?"16px":"32px",color:sub?G.text:G.textSub,fontWeight:sub?800:600,fontSize:sub?13:12}}>{erLabels[k]}</td>
@@ -1071,7 +1076,7 @@ function SecEstadoResultado({registros,vehiculos}) {
               </tr></thead>
               <tbody>
                 {erKeys.map(fila=>{
-                  const subCuentasCMV=fila==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&erMeses.some(m=>(m.detalle?.[c.codigo]||0)!==0)):[];
+                  const subCuentasCMV=fila==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&erMeses.some(m=>(m.detalle?.[c.codigo]||0)!==0)).sort((a,b)=>ordenER==="monto"?erMeses.reduce((s,m)=>s+(m.detalle?.[b.codigo]||0),0)-erMeses.reduce((s,m)=>s+(m.detalle?.[a.codigo]||0),0):0):[];
                   return <Fragment key={fila}>
                   <tr style={{borderBottom:`1px solid ${G.cardBorder}`,background:isSubtotal(fila)?G.input:"transparent"}}>
                     <td style={{padding:"8px 16px",paddingLeft:isSubtotal(fila)?"16px":"32px",color:isSubtotal(fila)?G.text:G.textSub,fontWeight:isSubtotal(fila)?800:600,fontSize:isSubtotal(fila)?12:11}}>{erLabels[fila]}</td>
