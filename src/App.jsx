@@ -634,8 +634,20 @@ function calcER(registros, mes, vehiculos=[]) {
 function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
   const [filtroTipo,setFiltroTipo]=useState("");
   const [filtroMes,setFiltroMes]=useState("");
+  const [busqueda,setBusqueda]=useState("");
   const meses=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
-  const filtrados=registros.filter(r=>{if(filtroTipo&&r.tipo!==filtroTipo)return false;if(filtroMes&&!r.fecha?.startsWith(filtroMes))return false;return true;}).sort((a,b)=>b.fecha?.localeCompare(a.fecha));
+  const filtrados=registros.filter(r=>{
+    if(filtroTipo&&r.tipo!==filtroTipo)return false;
+    if(filtroMes&&!r.fecha?.startsWith(filtroMes))return false;
+    if(busqueda){
+      const q=busqueda.toLowerCase();
+      const veh=vehiculos.find(v=>v.id===r.vehiculoId);
+      const c=PLAN[r.cuenta];
+      const campos=[r.descripcion,r.tipo,veh?.patente,veh?.marca,veh?.modelo,c?.codigo,c?.nombre,String(Math.round(r.importe||0)),r.fecha].filter(Boolean).join(" ").toLowerCase();
+      if(!campos.includes(q))return false;
+    }
+    return true;
+  }).sort((a,b)=>b.fecha?.localeCompare(a.fecha));
   const tcol={"Venta de vehículo":"gold","Compra de vehículo":"blue","Gasto por vehículo":"amber","Gasto general":"gray"};
   return (
     <div>
@@ -644,6 +656,11 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
         <Btn onClick={onNuevo} size="lg">+ Nuevo registro</Btn>
       </div>
       <Card style={{padding:16,marginBottom:16}}>
+        <div style={{position:"relative",marginBottom:12}}>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:G.textDim,fontSize:15,pointerEvents:"none"}}>🔍</span>
+          <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por descripción, patente, cuenta, monto..." style={{...s.inp,width:"100%",paddingLeft:38,boxSizing:"border-box"}}/>
+          {busqueda&&<button onClick={()=>setBusqueda("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:G.textDim,cursor:"pointer",fontSize:16,fontFamily:F}}>✕</button>}
+        </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
           <Sel label="Tipo" options={[{v:"",l:"Todos"},...["Venta de vehículo","Compra de vehículo","Gasto por vehículo","Gasto general"].map(x=>({v:x,l:x}))]} value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)}/>
           <Sel label="Mes" options={[{v:"",l:"Todos"},...meses.map(m=>({v:m,l:mesL(m)}))]} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}/>
@@ -949,6 +966,8 @@ function SecEstadoResultado({registros,vehiculos}) {
   const [ordenER,setOrdenER]=useState("cuenta");
   const [expandidos,setExpandidos]=useState({});
   const toggleExp=g=>setExpandidos(p=>({...p,[g]:!p[g]}));
+  const [ctaExp,setCtaExp]=useState({});
+  const toggleCta=c=>setCtaExp(p=>({...p,[c]:!p[c]}));
   const ultimos12=useMemo(()=>[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().slice(-12),[registros]);
   const er=useMemo(()=>calcER(registros,mes,vehiculos),[registros,mes,vehiculos]);
   const erMeses=useMemo(()=>ultimos12.map(m=>({mes:m,...calcER(registros,m,vehiculos)})),[registros,ultimos12,vehiculos]);
@@ -1013,9 +1032,31 @@ function SecEstadoResultado({registros,vehiculos}) {
                 {isExp&&cuentasG.map(c=>{
                   const val=er.detalle[c.codigo]||0;
                   if(val===0) return null;
-                  return <div key={c.codigo} style={{display:"flex",justifyContent:"space-between",padding:"6px 8px 6px 24px",borderBottom:`1px solid ${G.cardBorder}`}}>
-                    <span style={{fontSize:12,color:G.textDim,fontWeight:600}}>{c.codigo} — {c.nombre}</span>
-                    <span style={{fontFamily:"monospace",fontSize:12,color:grupo.key==="Ingresos"?G.green+"bb":G.red+"bb",fontWeight:700}}>{fmt(val)}</span>
+                  const esVeh=c.esVehiculo;
+                  // Movimientos que componen esta cuenta
+                  let movs;
+                  if(esVeh&&c.codigo==="2.1"){
+                    // Compra: costo de cada auto vendido este mes
+                    movs=er.vendidosEsteMes.map(v=>({fecha:v.fechaVenta,descripcion:(v.descripcion||v.patente)+" (compra)",importe:parseFloat(v.costo)||0}));
+                  } else if(esVeh){
+                    // Acondicionamiento: registros de esa cuenta de los autos vendidos este mes
+                    const idsVend=er.vendidosEsteMes.map(v=>v.id);
+                    movs=registros.filter(r=>idsVend.includes(r.vehiculoId)&&r.cuenta===c.codigo&&!r.esIngreso);
+                  } else {
+                    movs=(er.regs||[]).filter(r=>r.cuenta===c.codigo);
+                  }
+                  const ctaAbierta=ctaExp[c.codigo];
+                  return <div key={c.codigo}>
+                    <div onClick={()=>toggleCta(c.codigo)} style={{display:"flex",justifyContent:"space-between",padding:"6px 8px 6px 24px",borderBottom:`1px solid ${G.cardBorder}`,cursor:"pointer",background:ctaAbierta?"rgba(212,160,23,0.04)":"transparent"}}>
+                      <span style={{fontSize:12,color:G.textDim,fontWeight:600}}>{ctaAbierta?"▾ ":"▸ "}{c.codigo} — {c.nombre}</span>
+                      <span style={{fontFamily:"monospace",fontSize:12,color:grupo.key==="Ingresos"?G.green+"bb":G.red+"bb",fontWeight:700}}>{fmt(val)}</span>
+                    </div>
+                    {ctaAbierta&&(movs.length>0?movs.map((r,i)=>(
+                      <div key={r.id||i} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px 4px 44px",borderBottom:`1px solid ${G.cardBorder}`,background:"rgba(0,0,0,0.15)"}}>
+                        <span style={{fontSize:11,color:G.textDim,fontWeight:500}}>{r.fecha?r.fecha.slice(8,10)+"/"+r.fecha.slice(5,7):""} · {r.descripcion||"(sin descripción)"}</span>
+                        <span style={{fontFamily:"monospace",fontSize:11,color:G.textDim,fontWeight:600}}>{fmt(Math.round(parseFloat(r.importe)||0))}</span>
+                      </div>
+                    )):<div style={{padding:"4px 8px 4px 44px",fontSize:11,color:G.textDim,fontStyle:"italic"}}>Sin movimientos individuales</div>)}
                   </div>;
                 })}
                 {st&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 8px",margin:"8px 0",borderRadius:10,background:sv>=0?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)",border:`1px solid ${sv>=0?"rgba(34,197,94,0.2)":"rgba(239,68,68,0.2)"}`}}>
