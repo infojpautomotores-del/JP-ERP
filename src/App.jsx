@@ -556,10 +556,16 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
 }
 
 // ─── MODAL VEHÍCULO ───────────────────────────────────────────────────────────
-function ModalVehiculo({open,onClose,onSave,vehEditar=null}){
+function ModalVehiculo({open,onClose,onSave,vehEditar=null,vehiculos=[]}){
   const [f,setF]=useState({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false});
   useEffect(()=>{if(vehEditar)setF({patente:vehEditar.patente||"",descripcion:vehEditar.descripcion||"",marca:vehEditar.marca||"",modelo:vehEditar.modelo||"",anio:vehEditar.anio||"",color:vehEditar.color||"",costo:vehEditar.costo?.toString()||"",tipo:vehEditar.tipo||"Compra directa",fecha:vehEditar.fecha||hoy(),notas:vehEditar.notas||"",esConsignacion:vehEditar.tipo==="Consignación"});},[vehEditar]);
   const upd=(k,v)=>setF(p=>({...p,[k]:v}));
+  const generarPatenteTemp=()=>{
+    // Busca el número más alto usado en patentes TMP- y genera el siguiente
+    const usados=vehiculos.filter(v=>/^TMP-\d+$/i.test(v.patente||"")).map(v=>parseInt(v.patente.split("-")[1],10)||0);
+    const sig=(usados.length>0?Math.max(...usados):0)+1;
+    upd("patente","TMP-"+String(sig).padStart(3,"0"));
+  };
   const guardar=()=>{
     const tipoFinal=f.esConsignacion?"Consignación":(f.tipo==="Consignación"?"Compra directa":f.tipo);
     const veh={...(vehEditar||{}),id:vehEditar?.id||uid(),...f,tipo:tipoFinal,estado:vehEditar?.estado||"En stock",operacionOrigenId:vehEditar?.operacionOrigenId||null,fechaVenta:vehEditar?.fechaVenta||null,precioVenta:vehEditar?.precioVenta||null,_esEdicion:!!vehEditar};
@@ -568,7 +574,13 @@ function ModalVehiculo({open,onClose,onSave,vehEditar=null}){
     onClose();
   };
   return<Modal open={open}onClose={onClose}title={vehEditar?"Editar Vehículo":"Alta de vehículo"}size="lg"><div style={{display:"flex",flexDirection:"column",gap:12}}>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><Inp label="Patente *"value={f.patente}style={{textTransform:"uppercase"}}onChange={e=>upd("patente",e.target.value.toUpperCase())}/><Inp label="Descripción *"value={f.descripcion}onChange={e=>upd("descripcion",e.target.value)}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div>
+        <Inp label="Patente *"value={f.patente}style={{textTransform:"uppercase"}}onChange={e=>upd("patente",e.target.value.toUpperCase())}/>
+        <button onClick={generarPatenteTemp} type="button" style={{marginTop:6,background:"transparent",border:`1px solid ${G.inputBorder}`,borderRadius:6,color:G.textSub,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>Sin patente — generar temporal</button>
+      </div>
+      <Inp label="Descripción *"value={f.descripcion}onChange={e=>upd("descripcion",e.target.value)}/>
+    </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12}}><Inp label="Marca"value={f.marca}onChange={e=>upd("marca",e.target.value)}/><Inp label="Modelo"value={f.modelo}onChange={e=>upd("modelo",e.target.value)}/><Inp label="Año"value={f.anio}onChange={e=>upd("anio",e.target.value)}/><Sel label="Color"options={COLORES_VEH.map(c=>({v:c,l:c}))}value={f.color}onChange={e=>upd("color",e.target.value)}/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><NumInp label="Costo / Precio mínimo ($) *" placeholder="0" value={f.costo} onChange={v=>upd("costo",v)}/><Sel label="Tipo de entrada"options={["Compra directa","Parte de pago"].map(x=>({v:x,l:x}))}value={f.tipo==="Consignación"?"Compra directa":f.tipo}onChange={e=>upd("tipo",e.target.value)}/></div>
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.3)",borderRadius:10}}>
@@ -880,7 +892,14 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
               <CartesianGrid strokeDasharray="3 3"stroke={G.cardBorder}/>
               <XAxis dataKey="label"tick={{fill:G.textSub,fontSize:11}}/>
               <YAxis tick={{fill:G.textSub,fontSize:10}}tickFormatter={v=>metricaStock==="unidades"?v:(metricaStock==="usd"?"US$"+fmtM(v).replace("$",""):fmtM(v))}/>
-              <Tooltip formatter={(v,n)=>metricaStock==="unidades"?[`${v} uds`,n]:metricaStock==="usd"?[`US$ ${Math.round(v).toLocaleString("es-AR")}`,n]:[fmt(v),n]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}} labelStyle={{color:G.text,fontWeight:700}}/>
+              <Tooltip formatter={(v,n,p)=>{
+                const d=p&&p.payload?p.payload:{};
+                const tot=metricaStock==="importe"?(d.importe||0):metricaStock==="usd"?(d.usdTotal||0):(d.unidades||0);
+                const pc=tot>0&&n!=="Total"?` (${Math.round(v/tot*100)}%)`:"";
+                if(metricaStock==="unidades")return [`${v} uni${pc}`,n];
+                if(metricaStock==="usd")return [`US$ ${Math.round(v).toLocaleString("es-AR")}${pc}`,n];
+                return [`${fmt(v)}${pc}`,n];
+              }} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}} labelStyle={{color:G.text,fontWeight:700}}/>
               <Legend wrapperStyle={{fontSize:12,color:G.textSub}}/>
               <Bar dataKey={metricaStock==="importe"?"importePropios":metricaStock==="usd"?"usdPropios":"propios"} name="Propios" fill={G.gold} stackId="a"/>
               <Bar dataKey={metricaStock==="importe"?"importeConsig":metricaStock==="usd"?"usdConsig":"consignacion"} name="Consignación" fill={G.blue} stackId="a"/>
@@ -2021,7 +2040,7 @@ export default function App() {
         </div>
       </main>
       <ModalRegistro open={modReg} onClose={()=>{setModReg(false);setRegEditar(null);}} onSave={saveRegistro} vehiculos={vehiculos} registroEditar={regEditar}/>
-      <ModalVehiculo open={modVeh} onClose={()=>{setModVeh(false);setVehEditar(null);}} onSave={saveVehiculo} vehEditar={vehEditar}/>
+      <ModalVehiculo open={modVeh} onClose={()=>{setModVeh(false);setVehEditar(null);}} onSave={saveVehiculo} vehEditar={vehEditar} vehiculos={vehiculos}/>
     </div>
   );
 }
