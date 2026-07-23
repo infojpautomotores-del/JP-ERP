@@ -1187,7 +1187,9 @@ function SecEstadoResultado({registros,vehiculos}) {
 function SecRentabilidad({vehiculos,registros}) {
   const [vista,setVista]=useState("vehiculos");
   const [detOp,setDetOp]=useState(null);
-  const vV=vehiculos.filter(v=>v.estado==="Vendido").map(v=>{
+  const [filtroMes,setFiltroMes]=useState("");
+  const mesesVenta=[...new Set(vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta).map(v=>v.fechaVenta.slice(0,7)))].sort().reverse();
+  const vV=vehiculos.filter(v=>v.estado==="Vendido"&&(!filtroMes||v.fechaVenta?.startsWith(filtroMes))).map(v=>{
     const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2");
     const acond=gs.reduce((s,r)=>s+r.importe,0);
     const ce=parseFloat(v.costo)||0;
@@ -1217,7 +1219,11 @@ function SecRentabilidad({vehiculos,registros}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Rentabilidad por Vehículo</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Ganancia real por unidad vendida</p></div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select style={{...s.inp,maxWidth:170}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
+            <option value="">Todos los meses</option>
+            {mesesVenta.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
+          </select>
           {[{v:"vehiculos",l:"Por vehículo"},{v:"operaciones",l:"Por operación"}].map(t=>(
             <button key={t.v} onClick={()=>setVista(t.v)} style={{padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vista===t.v?G.gold:G.input,color:vista===t.v?"#000":G.textSub}}>{t.l}</button>
           ))}
