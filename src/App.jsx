@@ -391,10 +391,16 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   };
 
   const vehiculosDisponibles = vehiculos.filter(v=>{
-    if(v.estado!=="En stock")return false;
+    // Se muestran los que están en stock y también los vendidos, para poder cargar
+    // gastos que llegan después de la venta (ej: factura del mecánico a los días)
+    if(v.estado!=="En stock"&&v.estado!=="Vendido")return false;
     if(!patente)return true;
     const q=patente.toLowerCase();
     return (v.patente||"").toLowerCase().includes(q)||(v.marca||"").toLowerCase().includes(q)||(v.modelo||"").toLowerCase().includes(q)||(v.descripcion||"").toLowerCase().includes(q);
+  }).sort((a,b)=>{
+    // Primero los que están en stock, después los vendidos
+    if(a.estado!==b.estado)return a.estado==="En stock"?-1:1;
+    return 0;
   });
 
   const reset = () => {
@@ -463,15 +469,18 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
 
               {mostrarLista&&estadoPat!=="encontrado"&&(!esCompra)&&vehiculosDisponibles.length>0&&(
                 <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,background:G.card,border:`1px solid ${G.gold}`,borderRadius:10,marginTop:4,maxHeight:220,overflowY:"auto",boxShadow:"0 12px 30px rgba(0,0,0,0.6)"}}>
-                  <div style={{padding:"6px 12px",fontSize:10,color:G.textDim,fontWeight:700,textTransform:"uppercase",borderBottom:`1px solid ${G.cardBorder}`}}>Vehículos en stock</div>
+                  <div style={{padding:"6px 12px",fontSize:10,color:G.textDim,fontWeight:700,textTransform:"uppercase",borderBottom:`1px solid ${G.cardBorder}`}}>Vehículos en stock y vendidos</div>
                   {vehiculosDisponibles.map(v=>(
-                    <div key={v.id} onClick={()=>seleccionarVehiculo(v)} style={{padding:"10px 12px",cursor:"pointer",borderBottom:`1px solid ${G.cardBorder}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                    <div key={v.id} onClick={()=>seleccionarVehiculo(v)} style={{padding:"10px 12px",cursor:"pointer",borderBottom:`1px solid ${G.cardBorder}`,display:"flex",justifyContent:"space-between",alignItems:"center",opacity:v.estado==="Vendido"?0.75:1}}
                       onMouseDown={e=>e.preventDefault()}>
                       <div>
                         <span style={{fontFamily:"monospace",fontWeight:800,color:G.gold,marginRight:8}}>{v.patente}</span>
                         <span style={{color:G.text,fontSize:13,fontWeight:600}}>{v.descripcion}</span>
                       </div>
-                      {v.tipo==="Consignación"&&<Badge color="blue">Consig.</Badge>}
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        {v.tipo==="Consignación"&&<Badge color="blue">Consig.</Badge>}
+                        {v.estado==="Vendido"&&<Badge color="gray">Vendido</Badge>}
+                      </div>
                     </div>
                   ))}
                 </div>
