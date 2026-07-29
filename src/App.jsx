@@ -1935,6 +1935,19 @@ export default function App() {
     if(_esEdicion){
       await supabase.from("registros").update(localRegToDB(r)).eq("id",r.id);
       setRegistros(p=>p.map(x=>x.id===r.id?r:x));
+      // Al editar una venta, crear los autos en especie que todavía no existan en el stock
+      if(r.esIngreso){
+        const especies=(r.formas||[]).filter(f=>f.tipo==="Especie (vehículo)"&&f.patente);
+        for(const f of especies){
+          const yaExiste=vehiculos.some(v=>(v.patente||"").toUpperCase()===f.patente.toUpperCase());
+          if(!yaExiste){
+            const desc=[f.marca,f.modelo,f.anio].filter(Boolean).join(" ")||f.descVeh||f.patente;
+            const nv={id:uid(),patente:f.patente,descripcion:desc,costo:f.importe,tipo:"Parte de pago",fecha:r.fecha,estado:"En stock",operacionOrigenId:r.vehiculoId||r.id,fechaVenta:null,precioVenta:null,color:f.color||"",marca:f.marca||"",modelo:f.modelo||"",anio:f.anio||""};
+            await supabase.from("vehiculos").insert([localVehToDB(nv)]);
+            setVehiculos(p=>[...p,nv]);
+          }
+        }
+      }
       setRegEditar(null);
       return;
     }
@@ -1957,7 +1970,7 @@ export default function App() {
         setVehiculos(p=>[...p,nv]);
       });
     }
-  },[]);
+  },[vehiculos]);
 
   const saveVehiculo=useCallback(async veh=>{
     const{_esEdicion,...v}=veh;
