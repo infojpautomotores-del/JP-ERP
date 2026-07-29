@@ -1804,8 +1804,8 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
               <BarChart data={porVendedor} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={G.cardBorder}/>
                 <XAxis type="number" tick={{fill:G.textSub,fontSize:9}} tickFormatter={v=>fmtM(v)}/>
-                <YAxis type="category" dataKey="nombre" tick={{fill:G.textSub,fontSize:11,fontWeight:700}} width={60}/>
-                <Tooltip formatter={(v)=>[fmt(v),"Ventas"]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}}/>
+                <YAxis type="category" dataKey="nombre" tick={{fill:G.textSub,fontSize:11,fontWeight:700}} width={90} tickFormatter={(n)=>{const v=porVendedor.find(x=>x.nombre===n);return v?`${n} (${v.cant})`:n;}}/>
+                <Tooltip formatter={(v,n,p)=>[`${fmt(v)} · ${p?.payload?.cant||0} auto${(p?.payload?.cant||0)===1?"":"s"}`,"Ventas"]} contentStyle={{background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,fontFamily:F}}/>
                 <Bar dataKey="ventas" fill={G.gold} radius={[0,4,4,0]}/>
               </BarChart>
             </ResponsiveContainer>
