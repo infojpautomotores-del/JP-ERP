@@ -1028,6 +1028,7 @@ function SecEstadoResultado({registros,vehiculos}) {
           <div style={{display:"flex",background:G.input,borderRadius:10,padding:4,gap:2}}>
             {vistaBtns.map(t=><button key={t.v} onClick={()=>setVista(t.v)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vista===t.v?G.gold:"transparent",color:vista===t.v?"#000":G.textSub}}>{t.l}</button>)}
           </div>
+          <button onClick={()=>window.print()} className="no-print" style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>🖨 Imprimir</button>
         </div>
       </div>
 
@@ -1145,7 +1146,10 @@ function SecEstadoResultado({registros,vehiculos}) {
               </tr></thead>
               <tbody>
                 {erKeys.map(fila=>{
-                  const subCuentasCMV=fila==="cmv"?Object.values(PLAN).filter(c=>c.grupo==="Costo de Mercadería"&&erMeses.some(m=>(m.detalle?.[c.codigo]||0)!==0)).sort((a,b)=>ordenER==="monto"?erMeses.reduce((s,m)=>s+(m.detalle?.[b.codigo]||0),0)-erMeses.reduce((s,m)=>s+(m.detalle?.[a.codigo]||0),0):0):[];
+                  // Mapa de cada línea del ER a su grupo del plan de cuentas
+                  const grupoDe={cmv:"Costo de Mercadería",comercial:"Gastos de Comercialización",admin:"Gastos de Administración",impositivos:"Gastos Impositivos",bancarios:"Gastos Bancarios",extraordinarios:"Gastos Extraordinarios"};
+                  const gKey=grupoDe[fila];
+                  const subCuentas=gKey?Object.values(PLAN).filter(c=>c.grupo===gKey&&erMeses.some(m=>(m.detalle?.[c.codigo]||0)!==0)).sort((a,b)=>ordenER==="monto"?erMeses.reduce((s,m)=>s+(m.detalle?.[b.codigo]||0),0)-erMeses.reduce((s,m)=>s+(m.detalle?.[a.codigo]||0),0):0):[];
                   return <Fragment key={fila}>
                   <tr style={{borderBottom:`1px solid ${G.cardBorder}`,background:isSubtotal(fila)?G.input:"transparent"}}>
                     <td style={{padding:"8px 16px",paddingLeft:isSubtotal(fila)?"16px":"32px",color:isSubtotal(fila)?G.text:G.textSub,fontWeight:isSubtotal(fila)?800:600,fontSize:isSubtotal(fila)?12:11}}>{erLabels[fila]}</td>
@@ -1162,7 +1166,7 @@ function SecEstadoResultado({registros,vehiculos}) {
                       </td>;
                     })}
                   </tr>
-                  {subCuentasCMV.map(c=>(
+                  {subCuentas.map(c=>(
                     <tr key={c.codigo} style={{borderBottom:`1px solid ${G.cardBorder}`}}>
                       <td style={{padding:"6px 16px 6px 48px",color:G.textDim,fontWeight:600,fontSize:10}}>{c.codigo} — {c.nombre}</td>
                       {erMeses.map(m=>{
@@ -2055,7 +2059,7 @@ export default function App() {
           <button onClick={()=>setUsuario(null)}style={{marginTop:8,background:"none",border:`1px solid ${G.inputBorder}`,borderRadius:6,color:G.textDim,fontSize:10,padding:"4px 8px",cursor:"pointer",fontFamily:F,width:"100%"}}>Cerrar sesión ({usuario?.nombre})</button>
         </div>
       </aside>
-      <main style={{flex:1,overflowY:"auto",background:G.bg}}>
+      <main style={{flex:1,overflowY:"auto",background:G.bg}} id="print-area">
         <div style={{maxWidth:1200,margin:"0 auto",padding:"32px"}}>
           {tab==="dashboard"    && <SecDashboard     registros={registros} vehiculos={vehiculos} tiposCambio={tiposCambio}/>}
           {tab==="registros"    && <SecRegistros     registros={registros} vehiculos={vehiculos} onNuevo={()=>setModReg(true)} onEliminar={eliminarRegistro} onEditar={r=>{setRegEditar(r);setModReg(true);}}/> }
@@ -2067,6 +2071,15 @@ export default function App() {
           {tab==="anticipos"    && <SecAnticipos     registros={registros}/>}
         </div>
       </main>
+      <style>{`@media print {
+        aside { display: none !important; }
+        .no-print { display: none !important; }
+        main { overflow: visible !important; background: #fff !important; }
+        #print-area, #print-area * { color: #000 !important; }
+        #print-area { background: #fff !important; }
+        body { background: #fff !important; }
+        @page { margin: 1cm; }
+      }`}</style>
       <ModalRegistro open={modReg} onClose={()=>{setModReg(false);setRegEditar(null);}} onSave={saveRegistro} vehiculos={vehiculos} registroEditar={regEditar}/>
       <ModalVehiculo open={modVeh} onClose={()=>{setModVeh(false);setVehEditar(null);}} onSave={saveVehiculo} vehEditar={vehEditar} vehiculos={vehiculos}/>
     </div>
