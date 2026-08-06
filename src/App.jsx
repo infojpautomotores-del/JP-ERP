@@ -731,6 +731,7 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
 function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,guardarTipoCambio}){
   const [filtro,setFiltro]=useState("En stock");
   const [orden,setOrden]=useState("");
+  const [mesFoto,setMesFoto]=useState("");
   const [det,setDet]=useState(null);
   const [vistaStock,setVistaStock]=useState("lista");
   const [metricaStock,setMetricaStock]=useState("unidades");
@@ -758,7 +759,22 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
     const gan=v.precioVenta?(parseFloat(v.precioVenta)-costo):null;
     return{...v,acond,costo,gan,gastos:gs};
   });
+  const finMesFoto=mesFoto?mesFoto+"-31":null;
+  const enStockAFinDe=(v)=>{
+    if(!finMesFoto)return true;
+    const ing=v.fecha||"";
+    if(!ing||ing>finMesFoto)return false;
+    const vta=v.fechaVenta||"";
+    if(v.estado==="Vendido"&&vta&&vta<=finMesFoto)return false;
+    return true;
+  };
   const lista=vCC.filter(v=>{
+    if(mesFoto){
+      if(!enStockAFinDe(v))return false;
+      if(filtro==="Consignación")return v.tipo==="Consignación";
+      if(filtro==="En stock")return v.tipo!=="Consignación";
+      return true;
+    }
     if(!filtro)return true;
     if(filtro==="Consignación")return v.estado==="En stock"&&v.tipo==="Consignación";
     if(filtro==="En stock")return v.estado==="En stock"&&v.tipo!=="Consignación";
@@ -847,14 +863,21 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
       <Card style={{padding:12,marginBottom:16}}>
         <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{["","En stock","Consignación","Reservado","Vendido"].map(e=><button key={e}onClick={()=>setFiltro(e)}style={{padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:filtro===e?G.gold:G.input,color:filtro===e?"#000":G.textSub}}>{e||"Todos"}</button>)}</div>
-          <select value={orden} onChange={e=>setOrden(e.target.value)} style={{...s.inp,maxWidth:180}}>
-            <option value="">Orden: por defecto</option>
-            <option value="marca">Ordenar por marca (A-Z)</option>
-            <option value="costo">Ordenar por costo (mayor)</option>
-            <option value="anio">Ordenar por año (nuevo)</option>
-          </select>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <select value={mesFoto} onChange={e=>setMesFoto(e.target.value)} style={{...s.inp,maxWidth:200}} title="Ver el stock que tenías a fin de un mes">
+              <option value="">Stock actual (hoy)</option>
+              {[...new Set(vehiculos.map(v=>v.fecha?.slice(0,7)).filter(Boolean))].sort().reverse().map(m=><option key={m} value={m}>Foto a fin de {mesL(m)}</option>)}
+            </select>
+            <select value={orden} onChange={e=>setOrden(e.target.value)} style={{...s.inp,maxWidth:180}}>
+              <option value="">Orden: por defecto</option>
+              <option value="marca">Ordenar por marca (A-Z)</option>
+              <option value="costo">Ordenar por costo (mayor)</option>
+              <option value="anio">Ordenar por año (nuevo)</option>
+            </select>
+          </div>
         </div>
       </Card>
+      {mesFoto&&<div style={{background:"rgba(59,130,246,0.1)",border:`1px solid ${G.blue}`,borderRadius:8,padding:"8px 14px",marginBottom:12,fontSize:12,color:G.blue,fontWeight:600}}>📸 Foto del stock a fin de {mesL(mesFoto)} — {lista.length} vehículo(s), reconstruido según fechas de ingreso y venta.</div>}
       <Card>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
