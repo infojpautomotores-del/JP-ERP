@@ -1106,13 +1106,28 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
           </thead>
           <tbody>
             {filasComp.map((f,i)=>(
-              <tr key={i} style={{background:f.sub?"#f0ede4":"#fff",borderBottom:"1px solid #eee"}}>
-                <td style={{padding:"7px 10px",fontWeight:f.sub?800:500}}>{f.l}</td>
+              <Fragment key={i}>
+              <tr style={{background:f.sub?"#f0ede4":"#fff",borderBottom:"none"}}>
+                <td style={{padding:"7px 10px 2px",fontWeight:f.sub?800:500}}>{f.l}</td>
                 {erMeses.map(m=>{
                   const v=m[f.k]||0;
-                  return <td key={m.mes} style={{padding:"7px 10px",textAlign:"right",fontFamily:"monospace",fontWeight:f.sub?800:600,color:f.neg?"#dc2626":v>=0?"#15803d":"#dc2626"}}>{fmtR(f.neg?-Math.abs(v):v)}</td>;
+                  return <td key={m.mes} style={{padding:"7px 10px 2px",textAlign:"right",fontFamily:"monospace",fontWeight:f.sub?800:600,color:f.neg?"#dc2626":v>=0?"#15803d":"#dc2626"}}>{fmtR(f.neg?-Math.abs(v):v)}</td>;
                 })}
               </tr>
+              <tr style={{background:f.sub?"#f0ede4":"#fff",borderBottom:"1px solid #eee"}}>
+                <td style={{padding:"0 10px 6px",fontSize:9,color:"#bbb"}}>vs mes anterior</td>
+                {erMeses.map((m,mi)=>{
+                  const v=m[f.k]||0;
+                  const prev=mi>0?(erMeses[mi-1][f.k]||0):null;
+                  if(prev===null||prev===0)return <td key={m.mes} style={{padding:"0 10px 6px",textAlign:"right",fontSize:9,color:"#ccc"}}>—</td>;
+                  const varP=(v-prev)/Math.abs(prev)*100;
+                  // Para gastos, subir es malo (rojo); para ingresos/subtotales, subir es bueno (verde)
+                  const sube=varP>=0;
+                  const bueno=f.neg?!sube:sube;
+                  return <td key={m.mes} style={{padding:"0 10px 6px",textAlign:"right",fontSize:9,fontWeight:700,color:Math.abs(varP)<0.5?"#bbb":bueno?"#15803d":"#dc2626"}}>{sube?"▲":"▼"} {sube?"+":""}{varP.toFixed(0)}%</td>;
+                })}
+              </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
