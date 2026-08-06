@@ -1010,6 +1010,127 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
   </div>;
 }
 
+function ReporteGerencia({er,erMeses,mes,onClose}){
+  const fmtR=n=>{const x=Math.round(n||0);return (x<0?"-":"")+"$ "+Math.abs(x).toLocaleString("es-AR");};
+  const pctIng=v=>er.ingresos>0?(v/er.ingresos*100).toFixed(1)+"%":"—";
+  const lineas=[
+    {l:"Ingresos totales",v:er.ingresos,tipo:"ingreso"},
+    {l:"Costo de Mercadería (CMV)",v:-er.cmv,tipo:"costo"},
+    {l:"GANANCIA BRUTA",v:er.gBruta,tipo:"subtotal"},
+    {l:"Gastos de Comercialización",v:-er.comercial,tipo:"costo"},
+    {l:"RESULTADO COMERCIAL",v:er.resComercial,tipo:"subtotal"},
+    {l:"Gastos de Administración",v:-er.admin,tipo:"costo"},
+    {l:"EBITDA / Resultado Operativo",v:er.ebitda,tipo:"subtotal"},
+    {l:"Gastos Impositivos",v:-er.impositivos,tipo:"costo"},
+    {l:"Gastos Bancarios",v:-er.bancarios,tipo:"costo"},
+    {l:"Resultado antes de Extraordinarios",v:er.resAntesExtr,tipo:"subtotal"},
+    {l:"Resultados Extraordinarios",v:-er.extraordinarios,tipo:"costo"},
+    {l:"RESULTADO NETO",v:er.resNeto,tipo:"final"},
+  ];
+  const filasComp=[
+    {k:"ingresos",l:"Ingresos"},{k:"cmv",l:"CMV",neg:true},{k:"gBruta",l:"Ganancia Bruta",sub:true},
+    {k:"comercial",l:"G. Comercialización",neg:true},{k:"admin",l:"G. Administración",neg:true},
+    {k:"ebitda",l:"EBITDA",sub:true},{k:"impositivos",l:"G. Impositivos",neg:true},
+    {k:"bancarios",l:"G. Bancarios",neg:true},{k:"resNeto",l:"Resultado Neto",sub:true},
+  ];
+  const hoyStr=new Date().toLocaleDateString("es-AR");
+  return (
+    <div style={{position:"fixed",inset:0,background:"#fff",zIndex:9999,overflow:"auto"}} id="reporte-print">
+      <div className="no-print" style={{position:"sticky",top:0,background:"#1a1a1a",padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:2}}>
+        <span style={{color:"#fff",fontWeight:700,fontFamily:F,fontSize:14}}>Vista previa del reporte</span>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>window.print()} style={{padding:"8px 18px",borderRadius:8,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:"#d4a017",color:"#000"}}>🖨 Imprimir / Guardar PDF</button>
+          <button onClick={onClose} style={{padding:"8px 18px",borderRadius:8,fontWeight:700,border:"1px solid #555",cursor:"pointer",fontFamily:F,background:"transparent",color:"#fff"}}>Cerrar</button>
+        </div>
+      </div>
+      {/* HOJA 1 - Estado de Resultado */}
+      <div style={{maxWidth:800,margin:"0 auto",padding:"40px 48px",fontFamily:F,color:"#1a1a1a",boxSizing:"border-box"}} className="hoja">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",borderBottom:"3px solid #d4a017",paddingBottom:16,marginBottom:24}}>
+          <div>
+            <div style={{fontSize:26,fontWeight:900,letterSpacing:"-0.02em"}}>JP AUTOMOTORES</div>
+            <div style={{fontSize:14,color:"#666",fontWeight:600,marginTop:2}}>Estado de Resultado</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:12,color:"#666"}}>
+            <div style={{fontWeight:800,fontSize:15,color:"#1a1a1a"}}>{mesL(mes)}</div>
+            <div>Emitido: {hoyStr}</div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:28}}>
+          {[["Ganancia Bruta",er.gBruta],["EBITDA",er.ebitda],["Resultado Neto",er.resNeto]].map(([l,v])=>(
+            <div key={l} style={{border:"1px solid #ddd",borderRadius:8,padding:"14px 16px",background:"#fafafa"}}>
+              <div style={{fontSize:11,color:"#888",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.03em"}}>{l}</div>
+              <div style={{fontSize:20,fontWeight:900,marginTop:4,color:v>=0?"#15803d":"#dc2626"}}>{fmtR(v)}</div>
+              <div style={{fontSize:11,color:"#999",marginTop:2}}>{pctIng(v)} de ingresos</div>
+            </div>
+          ))}
+        </div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead>
+            <tr style={{background:"#1a1a1a",color:"#fff"}}>
+              <th style={{textAlign:"left",padding:"10px 14px",fontWeight:700}}>Concepto</th>
+              <th style={{textAlign:"right",padding:"10px 14px",fontWeight:700}}>Monto</th>
+              <th style={{textAlign:"right",padding:"10px 14px",fontWeight:700,width:80}}>% Ing.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineas.map((ln,i)=>{
+              const esSub=ln.tipo==="subtotal",esFinal=ln.tipo==="final";
+              return <tr key={i} style={{background:esFinal?"#1a1a1a":esSub?"#f0ede4":"#fff",borderBottom:"1px solid #eee"}}>
+                <td style={{padding:esFinal||esSub?"11px 14px":"8px 14px",fontWeight:esFinal||esSub?800:500,color:esFinal?"#fff":"#1a1a1a",fontSize:esFinal?14:13}}>{ln.l}</td>
+                <td style={{padding:esFinal||esSub?"11px 14px":"8px 14px",textAlign:"right",fontFamily:"monospace",fontWeight:esFinal||esSub?800:600,color:esFinal?(ln.v>=0?"#4ade80":"#f87171"):ln.tipo==="ingreso"?"#15803d":ln.tipo==="costo"?"#dc2626":ln.v>=0?"#15803d":"#dc2626"}}>{fmtR(ln.v)}</td>
+                <td style={{padding:esFinal||esSub?"11px 14px":"8px 14px",textAlign:"right",fontSize:11,color:esFinal?"#ccc":"#888",fontWeight:600}}>{pctIng(Math.abs(ln.v))}</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+        <div style={{marginTop:20,fontSize:10,color:"#aaa",textAlign:"center"}}>JP Automotores — Sistema de gestión · CMV reconocido por costo de venta</div>
+      </div>
+      {/* HOJA 2 - Comparativo */}
+      <div style={{maxWidth:900,margin:"0 auto",padding:"40px 48px",fontFamily:F,color:"#1a1a1a",boxSizing:"border-box"}} className="hoja hoja-nueva">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",borderBottom:"3px solid #d4a017",paddingBottom:16,marginBottom:24}}>
+          <div>
+            <div style={{fontSize:26,fontWeight:900,letterSpacing:"-0.02em"}}>JP AUTOMOTORES</div>
+            <div style={{fontSize:14,color:"#666",fontWeight:600,marginTop:2}}>Comparativo mensual</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:12,color:"#666"}}>
+            <div style={{fontWeight:800,fontSize:15,color:"#1a1a1a"}}>Últimos {erMeses.length} meses</div>
+            <div>Emitido: {hoyStr}</div>
+          </div>
+        </div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead>
+            <tr style={{background:"#1a1a1a",color:"#fff"}}>
+              <th style={{textAlign:"left",padding:"8px 10px",fontWeight:700}}>Concepto</th>
+              {erMeses.map(m=><th key={m.mes} style={{textAlign:"right",padding:"8px 10px",fontWeight:700}}>{mesL(m.mes)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {filasComp.map((f,i)=>(
+              <tr key={i} style={{background:f.sub?"#f0ede4":"#fff",borderBottom:"1px solid #eee"}}>
+                <td style={{padding:"7px 10px",fontWeight:f.sub?800:500}}>{f.l}</td>
+                {erMeses.map(m=>{
+                  const v=m[f.k]||0;
+                  return <td key={m.mes} style={{padding:"7px 10px",textAlign:"right",fontFamily:"monospace",fontWeight:f.sub?800:600,color:f.neg?"#dc2626":v>=0?"#15803d":"#dc2626"}}>{fmtR(f.neg?-Math.abs(v):v)}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{marginTop:20,fontSize:10,color:"#aaa",textAlign:"center"}}>JP Automotores — Sistema de gestión</div>
+      </div>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          #reporte-print { position: static !important; }
+          .hoja-nueva { page-break-before: always; }
+          @page { margin: 1cm; size: A4; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function SecEstadoResultado({registros,vehiculos}) {
   const mesesDisp=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
   const [mes,setMes]=useState(mesesDisp[0]||new Date().toISOString().slice(0,7));
@@ -1019,6 +1140,7 @@ function SecEstadoResultado({registros,vehiculos}) {
   const toggleExp=g=>setExpandidos(p=>({...p,[g]:!p[g]}));
   const [ctaExp,setCtaExp]=useState({});
   const toggleCta=c=>setCtaExp(p=>({...p,[c]:!p[c]}));
+  const [reporteAbierto,setReporteAbierto]=useState(false);
   const ultimos12=useMemo(()=>[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort().slice(-12),[registros]);
   const er=useMemo(()=>calcER(registros,mes,vehiculos),[registros,mes,vehiculos]);
   const erMeses=useMemo(()=>ultimos12.map(m=>({mes:m,...calcER(registros,m,vehiculos)})),[registros,ultimos12,vehiculos]);
@@ -1037,6 +1159,7 @@ function SecEstadoResultado({registros,vehiculos}) {
 
   return (
     <div>
+      {reporteAbierto&&<ReporteGerencia er={er} erMeses={erMeses} mes={mes} onClose={()=>setReporteAbierto(false)}/>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Estado de Resultado</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Cascada · Vertical · Horizontal</p></div>
         <div style={{display:"flex",gap:12,alignItems:"center"}}>
@@ -1051,7 +1174,7 @@ function SecEstadoResultado({registros,vehiculos}) {
           <div style={{display:"flex",background:G.input,borderRadius:10,padding:4,gap:2}}>
             {vistaBtns.map(t=><button key={t.v} onClick={()=>setVista(t.v)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vista===t.v?G.gold:"transparent",color:vista===t.v?"#000":G.textSub}}>{t.l}</button>)}
           </div>
-          <button onClick={()=>window.print()} className="no-print" style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>🖨 Imprimir</button>
+          <button onClick={()=>setReporteAbierto(true)} className="no-print" style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>🖨 Reporte gerencia</button>
         </div>
       </div>
 
@@ -2098,10 +2221,22 @@ export default function App() {
         aside { display: none !important; }
         .no-print { display: none !important; }
         main { overflow: visible !important; background: #fff !important; }
-        #print-area, #print-area * { color: #000 !important; }
-        #print-area { background: #fff !important; }
-        body { background: #fff !important; }
-        @page { margin: 1cm; }
+        body, #print-area { background: #fff !important; }
+        /* Forzar que el navegador imprima los colores de fondo y texto */
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        /* Texto base oscuro para legibilidad en papel */
+        #print-area { color: #1a1a1a !important; }
+        /* Tarjetas y contenedores: fondo blanco con borde suave */
+        #print-area [style*="background"] { background: #fff !important; }
+        /* Encabezados de tabla: banda gris clara */
+        #print-area thead th, #print-area th { background: #f0f0f0 !important; color: #1a1a1a !important; border-bottom: 2px solid #ccc !important; }
+        /* Filas de subtotales: fondo levemente sombreado */
+        #print-area tr[style*="input"], #print-area tr[style*="Input"] { background: #f7f7f7 !important; }
+        /* Colores contables: se conservan pero en tonos aptos para papel */
+        #print-area [style*="34,197,94"], #print-area [style*="rgb(34"], #print-area [style*="#22c55e"] { color: #15803d !important; }
+        #print-area td, #print-area th, #print-area div, #print-area span { border-color: #e0e0e0 !important; }
+        h2 { color: #1a1a1a !important; }
+        @page { margin: 1.2cm; }
       }`}</style>
       <ModalRegistro open={modReg} onClose={()=>{setModReg(false);setRegEditar(null);}} onSave={saveRegistro} vehiculos={vehiculos} registroEditar={regEditar}/>
       <ModalVehiculo open={modVeh} onClose={()=>{setModVeh(false);setVehEditar(null);}} onSave={saveVehiculo} vehEditar={vehEditar} vehiculos={vehiculos}/>
