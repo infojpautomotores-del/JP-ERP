@@ -1025,13 +1025,15 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
     {l:"Gastos Bancarios",v:-er.bancarios,tipo:"costo"},
     {l:"Resultado antes de Extraordinarios",v:er.resAntesExtr,tipo:"subtotal"},
     {l:"Resultados Extraordinarios",v:-er.extraordinarios,tipo:"costo"},
-    {l:"RESULTADO NETO",v:er.resNeto,tipo:"final"},
+    {l:"Resultado del ejercicio",v:er.resNeto,tipo:"subtotal"},
+    {l:"Retiro del socio",v:-er.retiro,tipo:"costo"},
+    {l:"RESULTADO NETO",v:er.resDespRetiro,tipo:"final"},
   ];
   const filasComp=[
     {k:"ingresos",l:"Ingresos"},{k:"cmv",l:"CMV",neg:true},{k:"gBruta",l:"Ganancia Bruta",sub:true},
     {k:"comercial",l:"G. Comercialización",neg:true},{k:"admin",l:"G. Administración",neg:true},
     {k:"ebitda",l:"EBITDA",sub:true},{k:"impositivos",l:"G. Impositivos",neg:true},
-    {k:"bancarios",l:"G. Bancarios",neg:true},{k:"resNeto",l:"Resultado Neto",sub:true},
+    {k:"bancarios",l:"G. Bancarios",neg:true},{k:"resDespRetiro",l:"Resultado Neto",sub:true},
   ];
   const hoyStr=new Date().toLocaleDateString("es-AR");
   return (
@@ -1056,7 +1058,7 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:28}}>
-          {[["Ganancia Bruta",er.gBruta],["EBITDA",er.ebitda],["Resultado Neto",er.resNeto]].map(([l,v])=>(
+          {[["Ganancia Bruta",er.gBruta],["EBITDA",er.ebitda],["Resultado Neto",er.resDespRetiro]].map(([l,v])=>(
             <div key={l} style={{border:"1px solid #ddd",borderRadius:8,padding:"14px 16px",background:"#fafafa"}}>
               <div style={{fontSize:11,color:"#888",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.03em"}}>{l}</div>
               <div style={{fontSize:20,fontWeight:900,marginTop:4,color:v>=0?"#15803d":"#dc2626"}}>{fmtR(v)}</div>
@@ -1135,8 +1137,14 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
       </div>
       <style>{`
         @media print {
-          .no-print { display: none !important; }
-          #reporte-print { position: static !important; }
+          aside { display: none !important; }
+          /* Ocultar visualmente todo el contenido de la página... */
+          body * { visibility: hidden !important; }
+          /* ...y volver a mostrar solo el reporte y su contenido */
+          #reporte-print, #reporte-print * { visibility: visible !important; }
+          /* Posicionar el reporte al inicio de la página impresa */
+          #reporte-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+          #reporte-print .no-print { display: none !important; }
           .hoja-nueva { page-break-before: always; }
           @page { margin: 1cm; size: A4; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -1166,8 +1174,8 @@ function SecEstadoResultado({registros,vehiculos}) {
     "Gastos Extraordinarios":er.resNeto,"Retiro del Socio":er.resDespRetiro,
   };
   const erKeys=["ingresos","cmv","gBruta","comercial","resComercial","admin","ebitda","impositivos","bancarios","resAntesExtr","extraordinarios","resNeto","retiro","resDespRetiro"];
-  const erLabels={"ingresos":"Ingresos totales","cmv":"CMV","gBruta":"GANANCIA BRUTA","comercial":"Gastos comercialización","resComercial":"RESULTADO COMERCIAL","admin":"Gastos administración","ebitda":"EBITDA","impositivos":"Gastos impositivos","bancarios":"Gastos bancarios","resAntesExtr":"RES. ANTES EXTRAORDINARIOS","extraordinarios":"Extraordinarios","resNeto":"RESULTADO NETO","retiro":"Retiro socio","resDespRetiro":"RES. DESPUÉS DE RETIRO"};
-  const isSubtotal=k=>["gBruta","resComercial","ebitda","resAntesExtr","resNeto","resDespRetiro"].includes(k);
+  const erLabels={"ingresos":"Ingresos totales","cmv":"CMV","gBruta":"GANANCIA BRUTA","comercial":"Gastos comercialización","resComercial":"RESULTADO COMERCIAL","admin":"Gastos administración","ebitda":"EBITDA","impositivos":"Gastos impositivos","bancarios":"Gastos bancarios","resAntesExtr":"RES. ANTES EXTRAORDINARIOS","extraordinarios":"Extraordinarios","resNeto":"Resultado del ejercicio","retiro":"Retiro socio","resDespRetiro":"RESULTADO NETO"};
+  const isSubtotal=k=>["gBruta","resComercial","ebitda","resAntesExtr","resDespRetiro"].includes(k);
   const isCosto=k=>["cmv","comercial","admin","impositivos","bancarios","extraordinarios","retiro"].includes(k);
 
   const vistaBtns=[{v:"cascada",l:"Cascada"},{v:"vertical",l:"Vertical"},{v:"horizontal",l:"Horizontal"}];
@@ -1199,7 +1207,7 @@ function SecEstadoResultado({registros,vehiculos}) {
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
         <KPI label="Ganancia Bruta" value={fmt(er.gBruta)} color={er.gBruta>=0?G.green:G.red} sub={`Margen: ${pct(er.gBruta,er.ingresos)}`}/>
         <KPI label="EBITDA" value={fmt(er.ebitda)} color={er.ebitda>=0?G.blue:G.red} sub="Resultado operativo"/>
-        <KPI label="Resultado Neto" value={fmt(er.resNeto)} color={er.resNeto>=0?G.gold:G.red} sub={`Margen: ${pct(er.resNeto,er.ingresos)}`}/>
+        <KPI label="Resultado Neto" value={fmt(er.resDespRetiro)} color={er.resDespRetiro>=0?G.gold:G.red} sub={`Margen: ${pct(er.resDespRetiro,er.ingresos)}`}/>
       </div>
 
       {vista==="cascada"&&(
@@ -1353,6 +1361,7 @@ function SecRentabilidad({vehiculos,registros}) {
   const [vista,setVista]=useState("vehiculos");
   const [detOp,setDetOp]=useState(null);
   const [filtroMes,setFiltroMes]=useState("");
+  const [ordenRent,setOrdenRent]=useState("ganancia");
   const mesesVenta=[...new Set(vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta).map(v=>v.fechaVenta.slice(0,7)))].sort().reverse();
   const vV=vehiculos.filter(v=>v.estado==="Vendido"&&(!filtroMes||v.fechaVenta?.startsWith(filtroMes))).map(v=>{
     const gs=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2");
@@ -1362,7 +1371,7 @@ function SecRentabilidad({vehiculos,registros}) {
     const pv=parseFloat(v.precioVenta)||0;
     const gan=pv-ct;
     return {...v,acond,ct,pv,gan,margen:pv>0?(gan/pv*100):0,gastos:gs};
-  }).sort((a,b)=>b.gan-a.gan);
+  }).sort((a,b)=>ordenRent==="margen"?b.margen-a.margen:b.gan-a.gan);
 
   const ops=[];const proc=new Set();
   vV.forEach(v=>{
@@ -1385,6 +1394,12 @@ function SecRentabilidad({vehiculos,registros}) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Rentabilidad por Vehículo</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Ganancia real por unidad vendida</p></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {vista==="vehiculos"&&(
+            <select style={{...s.inp,maxWidth:190}} value={ordenRent} onChange={e=>setOrdenRent(e.target.value)}>
+              <option value="ganancia">Ordenar por ganancia ($)</option>
+              <option value="margen">Ordenar por margen (%)</option>
+            </select>
+          )}
           <select style={{...s.inp,maxWidth:170}} value={filtroMes} onChange={e=>setFiltroMes(e.target.value)}>
             <option value="">Todos los meses</option>
             {mesesVenta.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
@@ -1834,8 +1849,10 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
     L.push(fila(["Costo de mercaderia (CMV)",Math.round(er.cmv)]));
     L.push(fila(["Ganancia bruta",Math.round(er.gBruta)]));
     L.push(fila(["Margen bruto %",er.ingresos>0?(er.gBruta/er.ingresos*100).toFixed(1):"0"]));
-    L.push(fila(["Resultado neto",Math.round(er.resNeto)]));
-    L.push(fila(["Margen neto %",er.ingresos>0?(er.resNeto/er.ingresos*100).toFixed(1):"0"]));
+    L.push(fila(["Resultado del ejercicio",Math.round(er.resNeto)]));
+    L.push(fila(["Retiro del socio",Math.round(er.retiro)]));
+    L.push(fila(["Resultado neto (despues de retiro)",Math.round(er.resDespRetiro)]));
+    L.push(fila(["Margen neto %",er.ingresos>0?(er.resDespRetiro/er.ingresos*100).toFixed(1):"0"]));
     L.push(fila(["Ticket promedio",Math.round(ticketProm)]));
     L.push(fila(["Gastos fijos",Math.round(gastosFijos)]));
     L.push(fila(["Punto equilibrio (autos)",puntoEqAutos.toFixed(1)]));
@@ -2235,22 +2252,6 @@ export default function App() {
       <style>{`@media print {
         aside { display: none !important; }
         .no-print { display: none !important; }
-        main { overflow: visible !important; background: #fff !important; }
-        body, #print-area { background: #fff !important; }
-        /* Forzar que el navegador imprima los colores de fondo y texto */
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        /* Texto base oscuro para legibilidad en papel */
-        #print-area { color: #1a1a1a !important; }
-        /* Tarjetas y contenedores: fondo blanco con borde suave */
-        #print-area [style*="background"] { background: #fff !important; }
-        /* Encabezados de tabla: banda gris clara */
-        #print-area thead th, #print-area th { background: #f0f0f0 !important; color: #1a1a1a !important; border-bottom: 2px solid #ccc !important; }
-        /* Filas de subtotales: fondo levemente sombreado */
-        #print-area tr[style*="input"], #print-area tr[style*="Input"] { background: #f7f7f7 !important; }
-        /* Colores contables: se conservan pero en tonos aptos para papel */
-        #print-area [style*="34,197,94"], #print-area [style*="rgb(34"], #print-area [style*="#22c55e"] { color: #15803d !important; }
-        #print-area td, #print-area th, #print-area div, #print-area span { border-color: #e0e0e0 !important; }
-        h2 { color: #1a1a1a !important; }
         @page { margin: 1.2cm; }
       }`}</style>
       <ModalRegistro open={modReg} onClose={()=>{setModReg(false);setRegEditar(null);}} onSave={saveRegistro} vehiculos={vehiculos} registroEditar={regEditar}/>
