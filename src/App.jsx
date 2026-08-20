@@ -53,6 +53,7 @@ const PLAN = {
   "5.2":  { codigo:"5.2",  nombre:"Monotributo / Autónomos Joaquín",     tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "5.3":  { codigo:"5.3",  nombre:"Municipalidad / Tasas",               tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "5.4":  { codigo:"5.4",  nombre:"Otros impuestos",                     tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
+  "5.5":  { codigo:"5.5",  nombre:"IVA a pagar",                         tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "6.1":  { codigo:"6.1",  nombre:"Comisiones bancarias",                tipo:"egreso",   grupo:"Gastos Bancarios",           esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "6.2":  { codigo:"6.2",  nombre:"Impuesto al débito y crédito",        tipo:"egreso",   grupo:"Gastos Bancarios",           esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "6.3":  { codigo:"6.3",  nombre:"Otros gastos bancarios",              tipo:"egreso",   grupo:"Gastos Bancarios",           esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
