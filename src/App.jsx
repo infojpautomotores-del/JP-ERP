@@ -1014,18 +1014,26 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
 function ReporteGerencia({er,erMeses,mes,onClose}){
   const fmtR=n=>{const x=Math.round(n||0);return (x<0?"-":"")+"$ "+Math.abs(x).toLocaleString("es-AR");};
   const pctIng=v=>er.ingresos>0?(v/er.ingresos*100).toFixed(1)+"%":"—";
+  // Subcuentas de un grupo con monto distinto de cero, ordenadas por monto desc
+  const subDe=(grupo)=>Object.values(PLAN).filter(c=>c.grupo===grupo&&(er.detalle?.[c.codigo]||0)!==0).sort((a,b)=>(er.detalle[b.codigo]||0)-(er.detalle[a.codigo]||0)).map(c=>({l:`${c.codigo} — ${c.nombre}`,v:-(er.detalle[c.codigo]||0),tipo:"sub"}));
   const lineas=[
     {l:"Ingresos totales",v:er.ingresos,tipo:"ingreso"},
     {l:"Costo de Mercadería (CMV)",v:-er.cmv,tipo:"costo"},
+    ...subDe("Costo de Mercadería"),
     {l:"GANANCIA BRUTA",v:er.gBruta,tipo:"subtotal"},
     {l:"Gastos de Comercialización",v:-er.comercial,tipo:"costo"},
+    ...subDe("Gastos de Comercialización"),
     {l:"RESULTADO COMERCIAL",v:er.resComercial,tipo:"subtotal"},
     {l:"Gastos de Administración",v:-er.admin,tipo:"costo"},
+    ...subDe("Gastos de Administración"),
     {l:"EBITDA / Resultado Operativo",v:er.ebitda,tipo:"subtotal"},
     {l:"Gastos Impositivos",v:-er.impositivos,tipo:"costo"},
+    ...subDe("Gastos Impositivos"),
     {l:"Gastos Bancarios",v:-er.bancarios,tipo:"costo"},
+    ...subDe("Gastos Bancarios"),
     {l:"Resultado antes de Extraordinarios",v:er.resAntesExtr,tipo:"subtotal"},
     {l:"Resultados Extraordinarios",v:-er.extraordinarios,tipo:"costo"},
+    ...subDe("Gastos Extraordinarios"),
     {l:"Resultado del ejercicio",v:er.resNeto,tipo:"subtotal"},
     {l:"Retiro del socio",v:-er.retiro,tipo:"costo"},
     {l:"RESULTADO NETO",v:er.resDespRetiro,tipo:"final"},
@@ -1077,7 +1085,14 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
           </thead>
           <tbody>
             {lineas.map((ln,i)=>{
-              const esSub=ln.tipo==="subtotal",esFinal=ln.tipo==="final";
+              const esSub=ln.tipo==="subtotal",esFinal=ln.tipo==="final",esDetalle=ln.tipo==="sub";
+              if(esDetalle){
+                return <tr key={i} style={{background:"#fff",borderBottom:"1px solid #f2f2f2"}}>
+                  <td style={{padding:"5px 14px 5px 32px",fontWeight:500,color:"#777",fontSize:11}}>{ln.l}</td>
+                  <td style={{padding:"5px 14px",textAlign:"right",fontFamily:"monospace",fontWeight:500,color:"#999",fontSize:11}}>{fmtR(ln.v)}</td>
+                  <td style={{padding:"5px 14px",textAlign:"right",fontSize:10,color:"#bbb",fontWeight:500}}>{pctIng(Math.abs(ln.v))}</td>
+                </tr>;
+              }
               return <tr key={i} style={{background:esFinal?"#1a1a1a":esSub?"#f0ede4":"#fff",borderBottom:"1px solid #eee"}}>
                 <td style={{padding:esFinal||esSub?"11px 14px":"8px 14px",fontWeight:esFinal||esSub?800:500,color:esFinal?"#fff":"#1a1a1a",fontSize:esFinal?14:13}}>{ln.l}</td>
                 <td style={{padding:esFinal||esSub?"11px 14px":"8px 14px",textAlign:"right",fontFamily:"monospace",fontWeight:esFinal||esSub?800:600,color:esFinal?(ln.v>=0?"#4ade80":"#f87171"):ln.tipo==="ingreso"?"#15803d":ln.tipo==="costo"?"#dc2626":ln.v>=0?"#15803d":"#dc2626"}}>{fmtR(ln.v)}</td>
