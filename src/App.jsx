@@ -577,6 +577,14 @@ function ModalVehiculo({open,onClose,onSave,vehEditar=null,vehiculos=[]}){
     upd("patente","TMP-"+String(sig).padStart(3,"0"));
   };
   const guardar=()=>{
+    const pat=(f.patente||"").trim().toUpperCase();
+    if(pat){
+      const dup=vehiculos.find(v=>(v.patente||"").toUpperCase()===pat&&v.id!==vehEditar?.id);
+      if(dup){
+        const ok=window.confirm(`⚠️ La patente ${pat} ya está en uso por:\n${dup.descripcion||dup.patente}\n\n¿Querés guardar igual? (podría duplicarse)`);
+        if(!ok)return;
+      }
+    }
     const tipoFinal=f.esConsignacion?"Consignación":(f.tipo==="Consignación"?"Compra directa":f.tipo);
     const veh={...(vehEditar||{}),id:vehEditar?.id||uid(),...f,tipo:tipoFinal,estado:vehEditar?.estado||"En stock",operacionOrigenId:vehEditar?.operacionOrigenId||null,fechaVenta:vehEditar?.fechaVenta||null,precioVenta:vehEditar?.precioVenta||null,_esEdicion:!!vehEditar};
     onSave(veh);
@@ -1154,15 +1162,24 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
       <style>{`
         @media print {
           aside { display: none !important; }
-          /* Ocultar visualmente todo el contenido de la página... */
           body * { visibility: hidden !important; }
-          /* ...y volver a mostrar solo el reporte y su contenido */
           #reporte-print, #reporte-print * { visibility: visible !important; }
-          /* Posicionar el reporte al inicio de la página impresa */
           #reporte-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
           #reporte-print .no-print { display: none !important; }
+          #reporte-print .hoja {
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+          }
           .hoja-nueva { page-break-before: always; }
-          @page { margin: 1cm; size: A4; }
+          #reporte-print table { width: 100% !important; table-layout: fixed !important; }
+          #reporte-print td, #reporte-print th { word-wrap: break-word !important; overflow-wrap: break-word !important; padding-left: 6px !important; padding-right: 6px !important; font-size: 10px !important; }
+          #reporte-print .hoja-nueva table { font-size: 9px !important; }
+          #reporte-print tr { page-break-inside: avoid !important; }
+          @page { margin: 1cm; size: A4 portrait; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
@@ -2162,6 +2179,8 @@ export default function App() {
         setVehiculos(p=>p.map(v=>v.id===r.vehiculoId?{...v,estado:"Vendido",precioVenta:r.importe,vendedor:r.vendedor,fechaVenta:r.fecha}:v));
       }
       (r.formas||[]).filter(f=>f.tipo==="Especie (vehículo)"&&f.patente).forEach(async f=>{
+        const yaExiste=vehiculos.some(v=>(v.patente||"").toUpperCase()===f.patente.toUpperCase());
+        if(yaExiste)return;
         const desc=[f.marca,f.modelo,f.anio].filter(Boolean).join(" ")||f.descVeh||f.patente;
         const nv={id:uid(),patente:f.patente,descripcion:desc,costo:f.importe,tipo:"Parte de pago",fecha:r.fecha,estado:"En stock",operacionOrigenId:r.vehiculoId||r.id,fechaVenta:null,precioVenta:null,color:f.color||"",marca:f.marca||"",modelo:f.modelo||"",anio:f.anio||""};
         await supabase.from("vehiculos").insert([localVehToDB(nv)]);
