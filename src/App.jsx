@@ -49,6 +49,7 @@ const PLAN = {
   "4.12": { codigo:"4.12", nombre:"Suscripciones (Infoauto, etc.)",      tipo:"egreso",   grupo:"Gastos de Administración",   esFijo:true,  esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "4.13": { codigo:"4.13", nombre:"Otros gastos de administración",      tipo:"egreso",   grupo:"Gastos de Administración",   esFijo:true,  esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "4.14": { codigo:"4.14", nombre:"Movilidad / Uber / Fletes generales", tipo:"egreso",   grupo:"Gastos de Administración",   esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
+  "4.15": { codigo:"4.15", nombre:"Internet / Telefonía",                 tipo:"egreso",   grupo:"Gastos de Administración",   esFijo:true,  esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "5.1":  { codigo:"5.1",  nombre:"Ingresos Brutos (IIBB)",              tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "5.2":  { codigo:"5.2",  nombre:"Monotributo / Autónomos Joaquín",     tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
   "5.3":  { codigo:"5.3",  nombre:"Municipalidad / Tasas",               tipo:"egreso",   grupo:"Gastos Impositivos",         esFijo:false, esExtraordinario:false, esRetiro:false, esAnticipo:false, esVehiculo:false },
@@ -333,6 +334,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   const [fecha,setFecha] = useState(hoy());
   const [desc,setDesc] = useState("");
   const [cuenta,setCuenta] = useState("1.1");
+  const [buscarCuenta,setBuscarCuenta] = useState("");
   const [vendedor,setVendedor] = useState("");
   const [importe,setImporte] = useState("");
   const [formas,setFormas] = useState([]);
@@ -374,6 +376,10 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
     if(esCompra) return ["2.1","2.2"].includes(c.codigo);
     if(esGastoVeh) return c.esVehiculo && !["2.1","2.2"].includes(c.codigo);
     return !c.esVehiculo && c.tipo==="egreso";
+  }).filter(c=>{
+    if(!buscarCuenta.trim()) return true;
+    const q=buscarCuenta.toLowerCase();
+    return c.codigo.toLowerCase().includes(q) || (c.nombre||"").toLowerCase().includes(q);
   });
 
   const handlePatente = val => {
@@ -448,7 +454,9 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
           <Inp label="Fecha *" type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
           <div>
             <Lbl>Cuenta contable *</Lbl>
-            <select style={s.inp} value={cuenta} onChange={e=>setCuenta(e.target.value)}>
+            <input style={{...s.inp,marginBottom:6}} placeholder="🔍 Buscar cuenta (ej: alqui, luz, 4.5...)" value={buscarCuenta} onChange={e=>setBuscarCuenta(e.target.value)}/>
+            <select style={s.inp} value={cuenta} onChange={e=>setCuenta(e.target.value)} size={buscarCuenta.trim()&&cuentasFilt.length>1?Math.min(cuentasFilt.length,6):undefined}>
+              {cuentasFilt.length===0&&<option value="">Sin coincidencias</option>}
               {cuentasFilt.map(c=><option key={c.codigo} value={c.codigo}>{c.codigo} — {c.nombre}</option>)}
             </select>
           </div>
@@ -567,8 +575,8 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
 
 // ─── MODAL VEHÍCULO ───────────────────────────────────────────────────────────
 function ModalVehiculo({open,onClose,onSave,vehEditar=null,vehiculos=[]}){
-  const [f,setF]=useState({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false});
-  useEffect(()=>{if(vehEditar)setF({patente:vehEditar.patente||"",descripcion:vehEditar.descripcion||"",marca:vehEditar.marca||"",modelo:vehEditar.modelo||"",anio:vehEditar.anio||"",color:vehEditar.color||"",costo:vehEditar.costo?.toString()||"",tipo:vehEditar.tipo||"Compra directa",fecha:vehEditar.fecha||hoy(),notas:vehEditar.notas||"",esConsignacion:vehEditar.tipo==="Consignación"});},[vehEditar]);
+  const [f,setF]=useState({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false,unidad:"Usado"});
+  useEffect(()=>{if(vehEditar)setF({patente:vehEditar.patente||"",descripcion:vehEditar.descripcion||"",marca:vehEditar.marca||"",modelo:vehEditar.modelo||"",anio:vehEditar.anio||"",color:vehEditar.color||"",costo:vehEditar.costo?.toString()||"",tipo:vehEditar.tipo||"Compra directa",fecha:vehEditar.fecha||hoy(),notas:vehEditar.notas||"",esConsignacion:vehEditar.tipo==="Consignación",unidad:vehEditar.unidad||"Usado"});},[vehEditar]);
   const upd=(k,v)=>setF(p=>({...p,[k]:v}));
   const generarPatenteTemp=()=>{
     // Busca el número más alto usado en patentes TMP- y genera el siguiente
@@ -588,7 +596,7 @@ function ModalVehiculo({open,onClose,onSave,vehEditar=null,vehiculos=[]}){
     const tipoFinal=f.esConsignacion?"Consignación":(f.tipo==="Consignación"?"Compra directa":f.tipo);
     const veh={...(vehEditar||{}),id:vehEditar?.id||uid(),...f,tipo:tipoFinal,estado:vehEditar?.estado||"En stock",operacionOrigenId:vehEditar?.operacionOrigenId||null,fechaVenta:vehEditar?.fechaVenta||null,precioVenta:vehEditar?.precioVenta||null,_esEdicion:!!vehEditar};
     onSave(veh);
-    if(!vehEditar)setF({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false});
+    if(!vehEditar)setF({patente:"",descripcion:"",marca:"",modelo:"",anio:"",color:"",costo:"",tipo:"Compra directa",fecha:hoy(),notas:"",esConsignacion:false,unidad:"Usado"});
     onClose();
   };
   return<Modal open={open}onClose={onClose}title={vehEditar?"Editar Vehículo":"Alta de vehículo"}size="lg"><div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -604,6 +612,14 @@ function ModalVehiculo({open,onClose,onSave,vehEditar=null,vehiculos=[]}){
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.3)",borderRadius:10}}>
       <input type="checkbox" id="consigStock" checked={f.esConsignacion} onChange={e=>upd("esConsignacion",e.target.checked)} style={{width:16,height:16,cursor:"pointer",accentColor:G.blue}}/>
       <label htmlFor="consigStock" style={{color:G.blue,fontWeight:700,fontSize:13,cursor:"pointer"}}>Consignación — este vehículo no es propio, fue recibido para vender</label>
+    </div>
+    <div>
+      <Lbl>Tipo de unidad</Lbl>
+      <div style={{display:"flex",gap:8,marginTop:4}}>
+        {["Usado","0km"].map(u=>(
+          <button key={u} type="button" onClick={()=>upd("unidad",u)} style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,border:`1px solid ${f.unidad===u?G.gold:G.inputBorder}`,background:f.unidad===u?G.goldDim:"transparent",color:f.unidad===u?G.gold:G.textSub}}>{u}</button>
+        ))}
+      </div>
     </div>
     <Inp label="Fecha ingreso"type="date"value={f.fecha}onChange={e=>upd("fecha",e.target.value)}/>
     <Inp label="Notas"value={f.notas}onChange={e=>upd("notas",e.target.value)}/>
@@ -665,6 +681,33 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
   const [filtroTipo,setFiltroTipo]=useState("");
   const [filtroMes,setFiltroMes]=useState("");
   const [busqueda,setBusqueda]=useState("");
+  const GASTOS_FIJOS=[
+    {nombre:"Alquiler",cuenta:"4.4"},
+    {nombre:"Electricidad",cuenta:"4.5"},
+    {nombre:"Internet / Telefonía",cuenta:"4.15"},
+    {nombre:"Limpieza",cuenta:"4.10"},
+    {nombre:"Honorarios contador",cuenta:"4.3"},
+    {nombre:"Publicidad — cartelería vía pública",cuenta:"3.2"},
+    {nombre:"Publicidad — Club Español",cuenta:"3.2"},
+    {nombre:"Sueldos",cuenta:"4.1"},
+  ];
+  const mesActual=new Date().toISOString().slice(0,7);
+  const [verChecklist,setVerChecklist]=useState(true);
+  const chequeoGastos=GASTOS_FIJOS.map(g=>{
+    const delMes=registros.filter(r=>r.cuenta===g.cuenta&&r.fecha?.startsWith(mesActual)&&!r.esIngreso);
+    let cargado;
+    if(g.cuenta==="3.2"){
+      const clave=g.nombre.includes("Español")?"español":"cartel";
+      cargado=delMes.some(r=>(r.descripcion||"").toLowerCase().includes(clave));
+    } else {
+      cargado=delMes.length>0;
+    }
+    const mesAnt=new Date(new Date().setMonth(new Date().getMonth()-1)).toISOString().slice(0,7);
+    const regAnt=registros.filter(r=>r.cuenta===g.cuenta&&r.fecha?.startsWith(mesAnt)&&!r.esIngreso);
+    const montoAnt=regAnt.reduce((s,r)=>s+(parseFloat(r.importe)||0),0);
+    return {...g,cargado,montoAnt};
+  });
+  const faltantes=chequeoGastos.filter(g=>!g.cargado).length;
   const meses=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].sort().reverse();
   const filtrados=registros.filter(r=>{
     if(filtroTipo&&r.tipo!==filtroTipo)return false;
@@ -685,6 +728,31 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Registro Central</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Base maestra de todos los movimientos</p></div>
         <Btn onClick={onNuevo} size="lg">+ Nuevo registro</Btn>
       </div>
+      <Card style={{padding:16,marginBottom:16,border:`1px solid ${faltantes>0?G.amber:G.cardBorder}`}}>
+        <div onClick={()=>setVerChecklist(!verChecklist)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:15}}>{faltantes>0?"⚠️":"✅"}</span>
+            <span style={{fontWeight:800,color:G.text,fontSize:14}}>Gastos fijos de {mesL(mesActual)}</span>
+            {faltantes>0
+              ? <span style={{fontSize:12,fontWeight:700,color:G.amber,background:"rgba(245,197,24,0.12)",padding:"2px 10px",borderRadius:12}}>{faltantes} sin cargar</span>
+              : <span style={{fontSize:12,fontWeight:700,color:G.green,background:"rgba(34,197,94,0.1)",padding:"2px 10px",borderRadius:12}}>Todos cargados</span>}
+          </div>
+          <span style={{color:G.textDim,fontSize:12}}>{verChecklist?"▲":"▼"}</span>
+        </div>
+        {verChecklist&&(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,marginTop:14}}>
+            {chequeoGastos.map((g,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:8,background:g.cargado?"rgba(34,197,94,0.06)":"rgba(245,197,24,0.06)",border:`1px solid ${g.cargado?"rgba(34,197,94,0.2)":"rgba(245,197,24,0.25)"}`}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,color:G.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.cargado?"✅":"⭕"} {g.nombre}</div>
+                  {!g.cargado&&g.montoAnt>0&&<div style={{fontSize:10,color:G.textDim,marginTop:2}}>Mes anterior: {fmt(g.montoAnt)}</div>}
+                </div>
+                {!g.cargado&&<button onClick={onNuevo} style={{background:G.gold,border:"none",borderRadius:6,color:"#000",padding:"4px 10px",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",marginLeft:8}}>Cargar</button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
       <Card style={{padding:16,marginBottom:16}}>
         <div style={{position:"relative",marginBottom:12}}>
           <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:G.textDim,fontSize:15,pointerEvents:"none"}}>🔍</span>
@@ -741,6 +809,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
   const [filtro,setFiltro]=useState("En stock");
   const [orden,setOrden]=useState("");
   const [mesFoto,setMesFoto]=useState("");
+  const [filtroUnidad,setFiltroUnidad]=useState("");
   const [det,setDet]=useState(null);
   const [vistaStock,setVistaStock]=useState("lista");
   const [metricaStock,setMetricaStock]=useState("unidades");
@@ -778,6 +847,7 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
     return true;
   };
   const lista=vCC.filter(v=>{
+    if(filtroUnidad&&(v.unidad||"Usado")!==filtroUnidad)return false;
     if(mesFoto){
       if(!enStockAFinDe(v))return false;
       if(filtro==="Consignación")return v.tipo==="Consignación";
@@ -873,6 +943,11 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
         <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{["","En stock","Consignación","Reservado","Vendido"].map(e=><button key={e}onClick={()=>setFiltro(e)}style={{padding:"6px 16px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:filtro===e?G.gold:G.input,color:filtro===e?"#000":G.textSub}}>{e||"Todos"}</button>)}</div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <select value={filtroUnidad} onChange={e=>setFiltroUnidad(e.target.value)} style={{...s.inp,maxWidth:140}}>
+              <option value="">Todos</option>
+              <option value="Usado">Usados</option>
+              <option value="0km">0km</option>
+            </select>
             <select value={mesFoto} onChange={e=>setMesFoto(e.target.value)} style={{...s.inp,maxWidth:200}} title="Ver el stock que tenías a fin de un mes">
               <option value="">Stock actual (hoy)</option>
               {[...new Set(vehiculos.map(v=>v.fecha?.slice(0,7)).filter(Boolean))].sort().reverse().map(m=><option key={m} value={m}>Foto a fin de {mesL(m)}</option>)}
@@ -1824,6 +1899,19 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
   const idx=mesesDisp.indexOf(mes);
   const erPrev=useMemo(()=>mesesDisp[idx+1]?calcER(registros,mesesDisp[idx+1],vehiculos):null,[registros,idx,mesesDisp,vehiculos]);
   const vMes=vehiculos.filter(v=>v.fechaVenta?.startsWith(mes));
+  const vendidosMes=vehiculos.filter(v=>v.estado==="Vendido"&&v.fechaVenta?.startsWith(mes));
+  const analisisUnidad=(()=>{
+    const calc=(lista)=>{
+      const cant=lista.length;
+      const ganancia=lista.reduce((s,v)=>{
+        const acond=registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((a,r)=>a+r.importe,0);
+        return s+((parseFloat(v.precioVenta)||0)-((parseFloat(v.costo)||0)+acond));
+      },0);
+      const ventas=lista.reduce((s,v)=>s+(parseFloat(v.precioVenta)||0),0);
+      return {cant,ganancia,ventas,margen:ventas>0?(ganancia/ventas*100):0};
+    };
+    return {okm:calc(vendidosMes.filter(v=>v.unidad==="0km")),usados:calc(vendidosMes.filter(v=>(v.unidad||"Usado")==="Usado"))};
+  })();
   const vMesPrev=vehiculos.filter(v=>v.fechaVenta?.startsWith(mesesDisp[idx+1]||"____"));
   const enStock=vehiculos.filter(v=>v.estado==="En stock");
   const valorStock=enStock.reduce((s,v)=>s+(parseFloat(v.costo)||0),0);
@@ -2027,6 +2115,20 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
           )}
         </Card>
       </div>
+      <Card style={{padding:20,marginBottom:16}}>
+        <div style={{fontWeight:800,color:G.text,fontSize:14,marginBottom:16}}>0km vs Usados — {mesL(mes)}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          {[["0km",analisisUnidad.okm,G.blue],["Usados",analisisUnidad.usados,G.gold]].map(([label,d,color])=>(
+            <div key={label} style={{border:`1px solid ${G.cardBorder}`,borderRadius:10,padding:16}}>
+              <div style={{fontSize:13,fontWeight:800,color,marginBottom:12}}>{label}</div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{color:G.textSub,fontSize:12,fontWeight:600}}>Vendidos</span><span style={{color:G.text,fontWeight:800,fontSize:14}}>{d.cant}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{color:G.textSub,fontSize:12,fontWeight:600}}>Facturación</span><span style={{fontFamily:"monospace",color:G.text,fontWeight:700,fontSize:13}}>{fmt(d.ventas)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{color:G.textSub,fontSize:12,fontWeight:600}}>Ganancia</span><span style={{fontFamily:"monospace",color:d.ganancia>=0?G.green:G.red,fontWeight:700,fontSize:13}}>{fmt(d.ganancia)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:G.textSub,fontSize:12,fontWeight:600}}>Margen</span><span style={{color:d.margen>=10?G.green:d.margen>=5?G.amber:G.red,fontWeight:800,fontSize:14}}>{d.margen.toFixed(1)}%</span></div>
+            </div>
+          ))}
+        </div>
+      </Card>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
         <Card style={{padding:20}}>
           <div style={{fontWeight:800,color:G.text,fontSize:14,marginBottom:16}}>Top 5 autos más rentables — {mesL(mes)}</div>
@@ -2106,9 +2208,9 @@ export default function App() {
   const [tiposCambio,setTiposCambio]=useState({}); // {mes: valor}
   const [loading,setLoading]=useState(true);
 
-  const dbVehToLocal=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",color:v.color||"",costo:v.costo,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacionOrigenId:v.operacion_origen_id,fechaVenta:v.fecha_venta,precioVenta:v.precio_venta,vendedor:v.vendedor||"",notas:v.notas||""});
+  const dbVehToLocal=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",color:v.color||"",costo:v.costo,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacionOrigenId:v.operacion_origen_id,fechaVenta:v.fecha_venta,precioVenta:v.precio_venta,vendedor:v.vendedor||"",notas:v.notas||"",unidad:v.unidad||"Usado"});
   const dbRegToLocal=r=>({id:r.id,tipo:r.tipo,fecha:r.fecha,descripcion:r.descripcion,cuenta:r.cuenta,vendedor:r.vendedor||"",vehiculoId:r.vehiculo_id,notas:r.notas||"",importe:r.importe,formas:r.formas||[],esIngreso:r.es_ingreso,esAnticipo:r.es_anticipo,empleadoAnticipo:r.empleado_anticipo||"",esConsignacion:r.es_consignacion||false});
-  const localVehToDB=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",color:v.color||"",costo:parseFloat(v.costo)||0,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacion_origen_id:v.operacionOrigenId||null,fecha_venta:v.fechaVenta||null,precio_venta:v.precioVenta?parseFloat(v.precioVenta):null,vendedor:v.vendedor||null,notas:v.notas||null});
+  const localVehToDB=v=>({id:v.id,patente:v.patente,descripcion:v.descripcion,marca:v.marca||"",modelo:v.modelo||"",anio:v.anio||"",color:v.color||"",costo:parseFloat(v.costo)||0,tipo:v.tipo,fecha:v.fecha,estado:v.estado,operacion_origen_id:v.operacionOrigenId||null,fecha_venta:v.fechaVenta||null,precio_venta:v.precioVenta?parseFloat(v.precioVenta):null,vendedor:v.vendedor||null,notas:v.notas||null,unidad:v.unidad||"Usado"});
   const localRegToDB=r=>({id:r.id,tipo:r.tipo,fecha:r.fecha,descripcion:r.descripcion,cuenta:r.cuenta,vendedor:r.vendedor||null,vehiculo_id:r.vehiculoId||null,notas:r.notas||null,importe:parseFloat(r.importe)||0,formas:r.formas||[],es_ingreso:r.esIngreso||false,es_anticipo:r.esAnticipo||false,empleado_anticipo:r.empleadoAnticipo||null,es_consignacion:r.esConsignacion||false});
 
   useEffect(()=>{
