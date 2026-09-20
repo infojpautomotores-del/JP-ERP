@@ -335,6 +335,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
   const [desc,setDesc] = useState("");
   const [cuenta,setCuenta] = useState("1.1");
   const [buscarCuenta,setBuscarCuenta] = useState("");
+  const [cuentaFocus,setCuentaFocus] = useState(false);
   const [vendedor,setVendedor] = useState("");
   const [importe,setImporte] = useState("");
   const [formas,setFormas] = useState([]);
@@ -452,13 +453,24 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
         {/* Fecha + Cuenta */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <Inp label="Fecha *" type="date" value={fecha} onChange={e=>setFecha(e.target.value)}/>
-          <div>
+          <div style={{position:"relative"}}>
             <Lbl>Cuenta contable *</Lbl>
-            <input style={{...s.inp,marginBottom:6}} placeholder="🔍 Buscar cuenta (ej: alqui, luz, 4.5...)" value={buscarCuenta} onChange={e=>setBuscarCuenta(e.target.value)}/>
-            <select style={s.inp} value={cuenta} onChange={e=>setCuenta(e.target.value)} size={buscarCuenta.trim()&&cuentasFilt.length>1?Math.min(cuentasFilt.length,6):undefined}>
-              {cuentasFilt.length===0&&<option value="">Sin coincidencias</option>}
-              {cuentasFilt.map(c=><option key={c.codigo} value={c.codigo}>{c.codigo} — {c.nombre}</option>)}
-            </select>
+            <input style={s.inp} placeholder="🔍 Buscar cuenta (ej: alqui, luz, 4.5...)"
+              value={cuentaFocus?buscarCuenta:(PLAN[cuenta]?`${cuenta} — ${PLAN[cuenta].nombre}`:buscarCuenta)}
+              onChange={e=>{setBuscarCuenta(e.target.value);}}
+              onFocus={()=>{setCuentaFocus(true);setBuscarCuenta("");}}
+              onBlur={()=>setTimeout(()=>setCuentaFocus(false),200)}/>
+            {cuentaFocus&&(
+              <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:20,background:G.card,border:`1px solid ${G.cardBorder}`,borderRadius:8,marginTop:2,maxHeight:240,overflowY:"auto",boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>
+                {cuentasFilt.length===0&&<div style={{padding:"10px 12px",color:G.textDim,fontSize:12}}>Sin coincidencias</div>}
+                {cuentasFilt.map(c=>(
+                  <div key={c.codigo} onMouseDown={e=>{e.preventDefault();setCuenta(c.codigo);setCuentaFocus(false);setBuscarCuenta("");}}
+                    style={{padding:"9px 12px",cursor:"pointer",fontSize:13,fontWeight:600,color:c.codigo===cuenta?G.gold:G.text,borderBottom:`1px solid ${G.cardBorder}`,background:c.codigo===cuenta?G.goldDim:"transparent"}}>
+                    {c.codigo} — {c.nombre}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
