@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabase";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, ComposedChart } from "recharts";
 
@@ -500,7 +501,7 @@ function ModalRegistro({open, onClose, onSave, vehiculos, registroEditar=null}) 
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         {v.tipo==="Consignación"&&<Badge color="blue">Consig.</Badge>}
-                        {v.estado==="Vendido"&&<Badge color="gray">Vendido</Badge>}
+                        {v.estado==="Vendido"&&<Badge color="gray">Vendido{v.fechaVenta?` · ${v.fechaVenta.slice(8,10)}/${v.fechaVenta.slice(5,7)}/${v.fechaVenta.slice(0,4)}`:""}</Badge>}
                       </div>
                     </div>
                   ))}
@@ -1140,7 +1141,7 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
     {k:"bancarios",l:"G. Bancarios",neg:true},{k:"resDespRetiro",l:"Resultado Neto",sub:true},
   ];
   const hoyStr=new Date().toLocaleDateString("es-AR");
-  return (
+  return createPortal((
     <div style={{position:"fixed",inset:0,background:"#fff",zIndex:9999,overflow:"auto"}} id="reporte-print">
       <div className="no-print" style={{position:"sticky",top:0,background:"#1a1a1a",padding:"12px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",zIndex:2}}>
         <span style={{color:"#fff",fontWeight:700,fontFamily:F,fontSize:14}}>Vista previa del reporte</span>
@@ -1248,10 +1249,11 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
       </div>
       <style>{`
         @media print {
-          aside { display: none !important; }
-          body * { visibility: hidden !important; }
-          #reporte-print, #reporte-print * { visibility: visible !important; }
-          #reporte-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+          /* Fondo blanco en toda la página para que nada salga en negro */
+          html, body { background: #fff !important; height: auto !important; }
+          /* Colapsar por completo todo lo que no sea el reporte (quitarlo del flujo, no solo ocultarlo) */
+          body > *:not(#reporte-print) { display: none !important; }
+          #reporte-print { position: static !important; left: auto !important; top: auto !important; width: 100% !important; height: auto !important; overflow: visible !important; background: #fff !important; }
           #reporte-print .no-print { display: none !important; }
           #reporte-print .hoja {
             max-width: 100% !important;
@@ -1260,6 +1262,7 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
             margin: 0 !important;
             box-sizing: border-box !important;
             overflow: hidden !important;
+            background: #fff !important;
           }
           .hoja-nueva { page-break-before: always; }
           #reporte-print table { width: 100% !important; table-layout: fixed !important; }
@@ -1271,7 +1274,7 @@ function ReporteGerencia({er,erMeses,mes,onClose}){
         }
       `}</style>
     </div>
-  );
+  ), document.body);
 }
 
 function SecEstadoResultado({registros,vehiculos}) {
