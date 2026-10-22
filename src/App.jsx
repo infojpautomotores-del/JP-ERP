@@ -106,6 +106,20 @@ const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2);
 const pct = (a,b) => b===0?"0.0%":((a/b)*100).toFixed(1)+"%";
 const mesL = m => { if(!m) return ""; const[y,mo]=m.split("-"); return MESES_L[parseInt(mo)-1]+" "+y.slice(2); };
 
+// ─── EXPORT CSV (helper global) ───────────────────────────────────────────────
+const csvEsc = v => { const s=String(v??""); return s.includes(",")||s.includes('"')||s.includes("\n")?'"'+s.replace(/"/g,'""')+'"':s; };
+const csvFila = arr => arr.map(csvEsc).join(",");
+// filas: array de arrays (cada array es una fila). nombre: sin extensión.
+const descargarCSV = (nombre, filas) => {
+  const csv = "﻿" + filas.map(f => Array.isArray(f) ? csvFila(f) : f).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nombre + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 // ─── UI BASE ─────────────────────────────────────────────────────────────────
 const s = {
   card: { background:G.card, border:`1px solid ${G.cardBorder}`, borderRadius:16 },
@@ -739,7 +753,18 @@ function SecRegistros({registros,vehiculos,onNuevo,onEliminar,onEditar}) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Registro Central</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Base maestra de todos los movimientos</p></div>
-        <Btn onClick={onNuevo} size="lg">+ Nuevo registro</Btn>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={()=>{
+            const L=[["JP AUTOMOTORES — REGISTROS (movimientos)"],["Generado",hoy()],[""]];
+            L.push(["Fecha","Tipo","Codigo cuenta","Cuenta","Descripcion","Patente","Vendedor","Importe","Es ingreso","Notas"]);
+            [...filtrados].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")).forEach(r=>{
+              const veh=vehiculos.find(v=>v.id===r.vehiculoId);const c=PLAN[r.cuenta];
+              L.push([r.fecha,r.tipo,r.cuenta,c?.nombre||"",r.descripcion,veh?.patente||(r.vehiculoId==="__na__"?"Sin asignar":""),r.vendedor||"",Math.round(parseFloat(r.importe)||0),r.esIngreso?"SI":"NO",r.notas||""]);
+            });
+            descargarCSV("JP-Registros-"+hoy(),L);
+          }} title="Descargar CSV" style={{padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>⬇ CSV</button>
+          <Btn onClick={onNuevo} size="lg">+ Nuevo registro</Btn>
+        </div>
       </div>
       <Card style={{padding:16,marginBottom:16,border:`1px solid ${faltantes>0?G.amber:G.cardBorder}`}}>
         <div onClick={()=>setVerChecklist(!verChecklist)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
@@ -908,11 +933,18 @@ function SecStock({vehiculos,registros,onNuevo,onEditar,onEliminar,tiposCambio,g
     setMesEditTC("");setValorEditTC("");
   };
 
+  const exportar=()=>{
+    const L=[["JP AUTOMOTORES — STOCK DE VEHICULOS"],["Generado",hoy()],[""]];
+    L.push(["Patente","Descripcion","Marca","Modelo","Anio","Color","Unidad","Tenencia","Estado","Fecha ingreso","Fecha venta","Costo","Acondicionamiento","Costo total","Precio venta","Ganancia"]);
+    vCC.forEach(v=>L.push([v.patente,v.descripcion,v.marca,v.modelo,v.anio,v.color,v.unidad||"Usado",v.tipo==="Consignación"?"Consignacion":"Propio",v.estado,v.fecha,v.fechaVenta||"",Math.round(parseFloat(v.costo)||0),Math.round(v.acond),Math.round(v.costo),v.precioVenta?Math.round(v.precioVenta):"",v.gan!=null?Math.round(v.gan):""]));
+    descargarCSV("JP-Stock-"+hoy(),L);
+  };
   return<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
       <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Stock de Vehículos</h2></div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
         {[{v:"lista",l:"Lista"},{v:"evolucion",l:"Evolución"},{v:"metricas",l:"Métricas"}].map(t=><button key={t.v}onClick={()=>setVistaStock(t.v)}style={{padding:"8px 16px",borderRadius:10,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vistaStock===t.v?G.gold:G.input,color:vistaStock===t.v?"#000":G.textSub}}>{t.l}</button>)}
+        <button onClick={exportar} title="Descargar CSV" style={{padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>⬇ CSV</button>
         <Btn variant="ghost" onClick={()=>setModalTC(true)}>💵 {tcActual>0?`$${tcActual.toLocaleString("es-AR")}`:"Tipos de cambio"}</Btn>
         <Btn onClick={onNuevo}>+ Alta</Btn>
       </div>
@@ -1320,6 +1352,13 @@ function SecEstadoResultado({registros,vehiculos}) {
           <div style={{display:"flex",background:G.input,borderRadius:10,padding:4,gap:2}}>
             {vistaBtns.map(t=><button key={t.v} onClick={()=>setVista(t.v)} style={{padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:F,background:vista===t.v?G.gold:"transparent",color:vista===t.v?"#000":G.textSub}}>{t.l}</button>)}
           </div>
+          <button onClick={()=>{
+            const L=[["JP AUTOMOTORES — ESTADO DE RESULTADO (comparativo mensual)"],["Generado",hoy()],[""]];
+            const filas=[["ingresos","Ingresos"],["cmv","CMV"],["gBruta","GANANCIA BRUTA"],["comercial","Gastos Comercializacion"],["resComercial","RESULTADO COMERCIAL"],["admin","Gastos Administracion"],["ebitda","EBITDA"],["impositivos","Gastos Impositivos"],["bancarios","Gastos Bancarios"],["resAntesExtr","Resultado antes extraordinarios"],["extraordinarios","Extraordinarios"],["resNeto","Resultado del ejercicio"],["retiro","Retiro socio"],["resDespRetiro","RESULTADO NETO"]];
+            L.push(["Concepto",...erMeses.map(m=>mesL(m.mes))]);
+            filas.forEach(([k,lab])=>L.push([lab,...erMeses.map(m=>Math.round(m[k]||0))]));
+            descargarCSV("JP-EstadoResultado-"+hoy(),L);
+          }} className="no-print" title="Descargar CSV" style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>⬇ CSV</button>
           <button onClick={()=>setReporteAbierto(true)} className="no-print" style={{padding:"6px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>🖨 Reporte gerencia</button>
         </div>
       </div>
@@ -1512,11 +1551,24 @@ function SecRentabilidad({vehiculos,registros}) {
     ops[ops.length-1].ganTotal=ops[ops.length-1].totI-ops[ops.length-1].totC;
   });
 
+  const exportar=()=>{
+    const L=[["JP AUTOMOTORES — RENTABILIDAD POR VEHICULO"],["Generado",hoy(),"Periodo",filtroMes?mesL(filtroMes):"Todos los meses"],[""]];
+    L.push(["Patente","Descripcion","Marca","Modelo","Anio","Unidad","Tenencia","Vendedor","Fecha venta","Costo","Acondicionamiento","Costo total","Precio venta","Ganancia","Margen %"]);
+    vV.forEach(v=>L.push([v.patente,v.descripcion,v.marca,v.modelo,v.anio,v.unidad||"Usado",v.tipo==="Consignación"?"Consignacion":"Propio",v.vendedor,v.fechaVenta,Math.round(parseFloat(v.costo)||0),Math.round(v.acond),Math.round(v.ct),Math.round(v.pv),Math.round(v.gan),v.margen.toFixed(1)]));
+    L.push([""]);
+    L.push(["TOTALES"]);
+    L.push(["Autos vendidos",vV.length]);
+    L.push(["Ganancia total",Math.round(vV.reduce((s,v)=>s+v.gan,0))]);
+    L.push(["Facturacion total",Math.round(vV.reduce((s,v)=>s+v.pv,0))]);
+    descargarCSV("JP-Rentabilidad-"+(filtroMes||"todos"),L);
+  };
+
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Rentabilidad por Vehículo</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Ganancia real por unidad vendida</p></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button onClick={exportar} title="Descargar CSV" style={{padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:700,border:`1px solid ${G.inputBorder}`,cursor:"pointer",fontFamily:F,background:G.input,color:G.textSub}}>⬇ CSV</button>
           {vista==="vehiculos"&&(
             <select style={{...s.inp,maxWidth:190}} value={ordenRent} onChange={e=>setOrdenRent(e.target.value)}>
               <option value="ganancia">Ordenar por ganancia ($)</option>
@@ -2048,6 +2100,15 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
     L.push(fila(["Extraordinarios",-Math.round(er.extraordinarios)]));
     L.push(fila(["RESULTADO NETO",Math.round(er.resNeto)]));
     L.push("");
+    // ===== ESTADO DE RESULTADO - TODOS LOS MESES (evolucion) =====
+    L.push(fila(["=== ESTADO DE RESULTADO POR MES (evolucion) ==="]));
+    const mesesER=[...new Set(registros.map(r=>r.fecha?.slice(0,7)))].filter(Boolean).sort();
+    const erTodos=mesesER.map(m=>({mes:m,...calcER(registros,m,vehiculos)}));
+    L.push(fila(["Concepto",...erTodos.map(e=>mesL(e.mes))]));
+    [["ingresos","Ingresos"],["cmv","CMV"],["gBruta","Ganancia Bruta"],["comercial","G. Comercializacion"],["admin","G. Administracion"],["ebitda","EBITDA"],["impositivos","G. Impositivos"],["bancarios","G. Bancarios"],["resNeto","Resultado del ejercicio"],["retiro","Retiro socio"],["resDespRetiro","Resultado Neto"]].forEach(([k,lab])=>{
+      L.push(fila([lab,...erTodos.map(e=>Math.round(e[k]||0))]));
+    });
+    L.push("");
     // ===== TODOS LOS REGISTROS =====
     L.push(fila(["=== REGISTROS (movimientos crudos) ==="]));
     L.push(fila(["Fecha","Tipo","Cuenta","Descripcion","Vehiculo","Vendedor","Importe","Es ingreso"]));
@@ -2069,7 +2130,7 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
         <div><h2 style={{margin:0,color:G.text,fontWeight:900,fontSize:20,fontFamily:F}}>Dashboard</h2><p style={{margin:"4px 0 0",color:G.textSub,fontSize:13,fontWeight:600}}>Métricas clave del negocio</p></div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <Btn onClick={exportarAnalisis} variant="ghost" size="md">⬇ Exportar análisis</Btn>
+          <Btn onClick={exportarAnalisis} variant="ghost" size="md">⬇ Exportar TODO (para IA)</Btn>
           <select style={s.inp} value={mes} onChange={e=>setMes(e.target.value)}>
             {mesesDisp.length===0&&<option value={mes}>{mes}</option>}
             {mesesDisp.map(m=><option key={m} value={m}>{mesL(m)}</option>)}
