@@ -1552,14 +1552,41 @@ function SecRentabilidad({vehiculos,registros}) {
   });
 
   const exportar=()=>{
-    const L=[["JP AUTOMOTORES — RENTABILIDAD POR VEHICULO"],["Generado",hoy(),"Periodo",filtroMes?mesL(filtroMes):"Todos los meses"],[""]];
+    const L=[["JP AUTOMOTORES — RENTABILIDAD"],["Generado",hoy(),"Periodo",filtroMes?mesL(filtroMes):"Todos los meses"],[""]];
+    L.push(["NOTA PARA ANALISIS: este archivo tiene DOS VISTAS DEL MISMO DATO."]);
+    L.push(["La seccion 'individual' lista cada auto por separado. La seccion 'en cadena' agrupa los mismos autos por operacion."]);
+    L.push(["La ganancia total es LA MISMA en ambas secciones. NO sumar las dos secciones entre si (seria doble conteo)."]);
+    L.push([""]);
+    // ===== PARTE 1: cada vehiculo individual =====
+    L.push(["=== RENTABILIDAD POR VEHICULO (individual) ==="]);
     L.push(["Patente","Descripcion","Marca","Modelo","Anio","Unidad","Tenencia","Vendedor","Fecha venta","Costo","Acondicionamiento","Costo total","Precio venta","Ganancia","Margen %"]);
     vV.forEach(v=>L.push([v.patente,v.descripcion,v.marca,v.modelo,v.anio,v.unidad||"Usado",v.tipo==="Consignación"?"Consignacion":"Propio",v.vendedor,v.fechaVenta,Math.round(parseFloat(v.costo)||0),Math.round(v.acond),Math.round(v.ct),Math.round(v.pv),Math.round(v.gan),v.margen.toFixed(1)]));
     L.push([""]);
-    L.push(["TOTALES"]);
+    L.push(["TOTALES (individual)"]);
     L.push(["Autos vendidos",vV.length]);
     L.push(["Ganancia total",Math.round(vV.reduce((s,v)=>s+v.gan,0))]);
     L.push(["Facturacion total",Math.round(vV.reduce((s,v)=>s+v.pv,0))]);
+    L.push([""]);
+    // ===== PARTE 2: operaciones en cadena (venta + autos recibidos en parte de pago) =====
+    L.push(["=== RENTABILIDAD POR OPERACION (en cadena) ==="]);
+    L.push(["Las operaciones encadenan la venta principal con los autos recibidos en parte de pago y luego vendidos"]);
+    L.push([""]);
+    L.push(["Operacion #","Rol","Patente","Descripcion","Costo total","Precio venta","Ganancia","Margen %","GANANCIA COMBINADA OPERACION","MARGEN COMBINADO %"]);
+    ops.forEach((op,i)=>{
+      const n=i+1;
+      const margenComb=op.totI>0?(op.ganTotal/op.totI*100).toFixed(1):"0";
+      // Fila de la madre (lleva el total combinado de la operacion)
+      const m=op.madre;
+      L.push([n,"Venta principal",m.patente,m.descripcion,Math.round(m.ct),Math.round(m.pv),Math.round(m.gan),m.pv>0?(m.gan/m.pv*100).toFixed(1):"0",Math.round(op.ganTotal),margenComb]);
+      // Filas de los hijos (autos recibidos en parte de pago)
+      op.hijos.forEach(h=>{
+        L.push([n,"Parte de pago",h.patente,h.descripcion,Math.round(h.ct),Math.round(h.pv),Math.round(h.gan),h.pv>0?(h.gan/h.pv*100).toFixed(1):"0","",""]);
+      });
+    });
+    L.push([""]);
+    L.push(["TOTALES (operaciones en cadena)"]);
+    L.push(["Cantidad de operaciones",ops.length]);
+    L.push(["Ganancia combinada total",Math.round(ops.reduce((s,o)=>s+o.ganTotal,0))]);
     descargarCSV("JP-Rentabilidad-"+(filtroMes||"todos"),L);
   };
 
@@ -2085,6 +2112,29 @@ function SecDashboard({registros,vehiculos,tiposCambio={}}) {
     });
     Object.entries(mapMod).sort((a,b)=>b[1].gan-a[1].gan).forEach(([k,d])=>{
       L.push(fila([k,d.cant,Math.round(d.gan),Math.round(d.gan/d.cant)]));
+    });
+    L.push("");
+    // ===== RENTABILIDAD POR OPERACION (en cadena) =====
+    L.push(fila(["=== RENTABILIDAD POR OPERACION (en cadena) ==="]));
+    L.push(fila(["NOTA: esta seccion agrupa por operacion los MISMOS autos ya listados arriba en el detalle. NO sumar esta seccion con el detalle por auto (seria doble conteo). La GANANCIA COMBINADA de cada operacion ya incluye la ganancia de la venta principal y la de los autos recibidos en parte de pago."]));
+    L.push(fila(["Encadena cada venta con los autos recibidos en parte de pago y luego vendidos"]));
+    L.push(fila(["Operacion #","Rol","Patente","Descripcion","Costo total","Precio venta","Ganancia","Margen %","GANANCIA COMBINADA","MARGEN COMBINADO %"]));
+    const gastosVeh=v=>registros.filter(r=>r.vehiculoId===v.id&&!r.esIngreso&&r.cuenta!=="2.1"&&r.cuenta!=="2.2").reduce((s,r)=>s+r.importe,0);
+    const procOp=new Set();let opN=0;
+    vehiculos.filter(v=>v.estado==="Vendido").sort((a,b)=>(b.precioVenta||0)-(a.precioVenta||0)).forEach(v=>{
+      if(procOp.has(v.id))return;procOp.add(v.id);
+      const ctM=(parseFloat(v.costo)||0)+gastosVeh(v);const pvM=parseFloat(v.precioVenta)||0;const ganM=pvM-ctM;
+      const hijos=vehiculos.filter(h=>h.operacionOrigenId===v.id&&h.estado==="Vendido");
+      hijos.forEach(h=>procOp.add(h.id));
+      let totI=pvM,totC=ctM;
+      hijos.forEach(h=>{totI+=(parseFloat(h.precioVenta)||0);totC+=((parseFloat(h.costo)||0)+gastosVeh(h));});
+      const ganComb=totI-totC;const margenComb=totI>0?(ganComb/totI*100).toFixed(1):"0";
+      opN++;
+      L.push(fila([opN,"Venta principal",v.patente,v.descripcion,Math.round(ctM),Math.round(pvM),Math.round(ganM),pvM>0?(ganM/pvM*100).toFixed(1):"0",Math.round(ganComb),margenComb]));
+      hijos.forEach(h=>{
+        const ctH=(parseFloat(h.costo)||0)+gastosVeh(h);const pvH=parseFloat(h.precioVenta)||0;
+        L.push(fila([opN,"Parte de pago",h.patente,h.descripcion,Math.round(ctH),Math.round(pvH),Math.round(pvH-ctH),pvH>0?((pvH-ctH)/pvH*100).toFixed(1):"0","",""]));
+      });
     });
     L.push("");
     // ===== ESTADO DE RESULTADO DEL MES =====
